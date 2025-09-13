@@ -175,3 +175,47 @@ export const useStore = defineStore({
     },
   },
 })
+
+// 添加系统数据相关的API调用函数
+export async function getSystemData() {
+  try {
+    const response = await axios.get(`${DATA_SERVER_URL}/data/summary`)
+    return {
+      success: true,
+      data: {
+        total_records: response.data.total_records || 0,
+        field_count: response.data.field_count || 0,
+        date_range: response.data.date_range || null,
+        entity_stats: response.data.entity_stats || {},
+        ...response.data
+      }
+    }
+  } catch (error) {
+    console.error('获取系统数据失败:', error)
+    return {
+      success: false,
+      error: error.message || '获取系统数据失败'
+    }
+  }
+}
+
+export async function getDataPreview(limit = 10) {
+  try {
+    const response = await axios.get(`${DATA_SERVER_URL}/data/preview?limit=${limit}`)
+    return {
+      success: true,
+      data: {
+        sample_data: response.data.data || [],
+        fields: response.data.fields || [],
+        total: response.data.total || 0,
+        ...response.data
+      }
+    }
+  } catch (error) {
+    console.error('获取数据预览失败:', error)
+    return {
+      success: false,
+      error: error.message || '获取数据预览失败'
+    }
+  }
+}
