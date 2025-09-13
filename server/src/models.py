@@ -245,11 +245,16 @@ class Model:
         }
     
     def analyze_time_series(self, start_date=None, end_date=None, methods=None):
-        """时序分析"""
+        """时序分析（向后兼容）"""
+        return self.analyze_time_series_enhanced(start_date, end_date, methods)
+    
+    def analyze_time_series_enhanced(self, start_date=None, end_date=None, methods=None, companies=None, industries=None, categories=None, industry_level1=None, industry_level2=None):
+        """增强版时序分析，支持筛选条件"""
         if methods is None:
             methods = ["acf", "stl"]
         
-        filtered_data = self._get_filtered_data(start_date, end_date)
+        # 使用增强的筛选功能
+        filtered_data = self._get_filtered_data_enhanced(start_date, end_date, companies, industries, categories, industry_level1, industry_level2)
         
         if filtered_data.empty:
             return {"analysis": {}, "charts": [], "message": "没有数据可供分析"}
@@ -259,6 +264,10 @@ class Model:
             return {"analysis": {}, "charts": [], "message": "数据中缺少日期字段"}
         
         time_series = filtered_data.groupby('日期').size().reset_index(name='投诉数量')
+        # 按日期排序确保时间序列的连续性
+        time_series = time_series.sort_values('日期').reset_index(drop=True)
+        
+        logger.info(f"时序分析数据: {len(time_series)}个数据点, 日期范围: {time_series['日期'].min()} 至 {time_series['日期'].max()}")
         
         results = {"time_series": time_series.to_dict('records')}
         charts = []
@@ -300,7 +309,7 @@ class Model:
         """获取筛选后的数据"""
         return self._get_filtered_data_enhanced(start_date, end_date)
     
-    def _get_filtered_data_enhanced(self, start_date=None, end_date=None, companies=None, industries=None, categories=None):
+    def _get_filtered_data_enhanced(self, start_date=None, end_date=None, companies=None, industries=None, categories=None, industry_level1=None, industry_level2=None):
         """获取增强筛选后的数据"""
         if self._data_cache is None or self._data_cache.empty:
             logger.warning("数据缓存为空")
@@ -335,17 +344,71 @@ class Model:
         
         # 企业筛选
         if companies and '企业名称' in data.columns:
-            data = data[data['企业名称'].isin(companies)]
+            # 处理空值选项
+            actual_companies = [c for c in companies if not c.startswith('[空值]')]
+            has_null_option = any(c.startswith('[空值]') for c in companies)
+            
+            if has_null_option and actual_companies:
+                # 包含空值和实际企业
+                data = data[(data['企业名称'].isin(actual_companies)) | (data['企业名称'].isnull())]
+            elif has_null_option:
+                # 只选择空值
+                data = data[data['企业名称'].isnull()]
+            else:
+                # 只选择实际企业
+                data = data[data['企业名称'].isin(actual_companies)]
             logger.info(f"企业筛选后: {len(data)} 条")
         
-        # 行业筛选
+        # 行业大类筛选
+        if industry_level1 and '行业名称(1)' in data.columns:
+            actual_level1 = [i for i in industry_level1 if not i.startswith('[空值]')]
+            has_null_option = any(i.startswith('[空值]') for i in industry_level1)
+            
+            if has_null_option and actual_level1:
+                data = data[(data['行业名称(1)'].isin(actual_level1)) | (data['行业名称(1)'].isnull())]
+            elif has_null_option:
+                data = data[data['行业名称(1)'].isnull()]
+            else:
+                data = data[data['行业名称(1)'].isin(actual_level1)]
+            logger.info(f"行业大类筛选后: {len(data)} 条")
+        
+        # 行业中类筛选
+        if industry_level2 and '行业名称(2)' in data.columns:
+            actual_level2 = [i for i in industry_level2 if not i.startswith('[空值]')]
+            has_null_option = any(i.startswith('[空值]') for i in industry_level2)
+            
+            if has_null_option and actual_level2:
+                data = data[(data['行业名称(2)'].isin(actual_level2)) | (data['行业名称(2)'].isnull())]
+            elif has_null_option:
+                data = data[data['行业名称(2)'].isnull()]
+            else:
+                data = data[data['行业名称(2)'].isin(actual_level2)]
+            logger.info(f"行业中类筛选后: {len(data)} 条")
+        
+        # 详细行业分类筛选（保持向后兼容）
         if industries and '行业分类' in data.columns:
-            data = data[data['行业分类'].isin(industries)]
-            logger.info(f"行业筛选后: {len(data)} 条")
+            actual_industries = [i for i in industries if not i.startswith('[空值]')]
+            has_null_option = any(i.startswith('[空值]') for i in industries)
+            
+            if has_null_option and actual_industries:
+                data = data[(data['行业分类'].isin(actual_industries)) | (data['行业分类'].isnull())]
+            elif has_null_option:
+                data = data[data['行业分类'].isnull()]
+            else:
+                data = data[data['行业分类'].isin(actual_industries)]
+            logger.info(f"详细行业分类筛选后: {len(data)} 条")
         
         # 问题分类筛选
         if categories and '问题分类' in data.columns:
-            data = data[data['问题分类'].isin(categories)]
+            actual_categories = [c for c in categories if not c.startswith('[空值]')]
+            has_null_option = any(c.startswith('[空值]') for c in categories)
+            
+            if has_null_option and actual_categories:
+                data = data[(data['问题分类'].isin(actual_categories)) | (data['问题分类'].isnull())]
+            elif has_null_option:
+                data = data[data['问题分类'].isnull()]
+            else:
+                data = data[data['问题分类'].isin(actual_categories)]
             logger.info(f"问题分类筛选后: {len(data)} 条")
         
         return data
@@ -383,7 +446,7 @@ class Model:
             logger.error(f"ACF分析失败: {e}")
             return {"error": str(e)}
     
-    def _stl_decomposition(self, time_series, seasonal=7):
+    def _stl_decomposition(self, time_series, seasonal=12):
         """STL分解"""
         if not HAS_STATSMODELS:
             return {"error": "缺少statsmodels库"}
@@ -394,63 +457,168 @@ class Model:
             if len(ts_values) < seasonal * 2:
                 return {"error": f"数据量不足，至少需要 {seasonal * 2} 个观测值"}
             
-            # 创建时间序列
-            ts = pd.Series(ts_values, index=pd.date_range(start='2020-01-01', periods=len(ts_values), freq='D'))
+            # 使用真实的日期索引
+            if '日期' in time_series.columns:
+                # 将日期转换为 pandas Timestamp 索引
+                dates = pd.to_datetime(time_series['日期'])
+                # 确保日期是唯一且排序的
+                dates = dates.sort_values()
+                dates_unique = dates.drop_duplicates()
+                
+                if len(dates_unique) != len(ts_values):
+                    logger.warning(f"日期数量({len(dates_unique)})与数值数量({len(ts_values)})不匹配，使用日期范围填充")
+                    # 创建连续的日期范围
+                    start_date = dates.min()
+                    end_date = dates.max()
+                    date_index = pd.date_range(start=start_date, end=end_date, freq='D')[:len(ts_values)]
+                else:
+                    date_index = dates_unique
+                    
+                # 重新索引数据以匹配日期
+                if len(date_index) > len(ts_values):
+                    date_index = date_index[:len(ts_values)]
+                elif len(date_index) < len(ts_values):
+                    ts_values = ts_values[:len(date_index)]
+            else:
+                # 如果没有日期列，创建虚拟日期索引
+                date_index = pd.date_range(start='2023-01-01', periods=len(ts_values), freq='D')
             
-            # 进行STL分解
-            stl = STL(ts, seasonal=seasonal)
-            result = stl.fit()
+            # 创建带有真实日期索引的时间序列
+            ts = pd.Series(ts_values, index=date_index)
+            ts = ts.sort_index()  # 确保按日期排序
             
-            # 构建结果
-            dates = time_series['日期'].tolist() if '日期' in time_series.columns else list(range(len(ts_values)))
+            logger.info(f"STL分解: 数据点数={len(ts)}, 日期范围={ts.index.min()}至{ts.index.max()}")
+            
+            # 进行STL分解，显式指定周期
+            try:
+                # 对于日数据，月周期使用30天，年周期使用365天
+                if len(ts) >= 30:
+                    # 根据数据长度选择合适的周期
+                    if seasonal == 12:  # 月周期，对于日数据约30天
+                        actual_seasonal = min(29, len(ts) // 2)  # 确保是奇数
+                        if actual_seasonal % 2 == 0:
+                            actual_seasonal -= 1
+                        actual_seasonal = max(7, actual_seasonal)  # 至少为7
+                    else:
+                        actual_seasonal = seasonal
+                        if actual_seasonal % 2 == 0:
+                            actual_seasonal += 1  # 转换为奇数
+                        actual_seasonal = min(actual_seasonal, len(ts) // 2)
+                        actual_seasonal = max(3, actual_seasonal)  # 至少为3
+                    
+                    logger.info(f"STL分解使用周期: {actual_seasonal} (数据点数: {len(ts)})")
+                    stl = STL(ts, seasonal=actual_seasonal)
+                    result = stl.fit()
+                else:
+                    return {"error": f"数据量不足，需要至少30个观测值进行月周期分析，当前只有{len(ts)}个"}
+            except Exception as e:
+                logger.warning(f"标准STL分解失败: {e}")
+                # 尝试使用更简单的周期设置
+                try:
+                    simple_period = min(7, len(ts) // 3)  # 使用更小的周期
+                    if simple_period % 2 == 0:
+                        simple_period -= 1
+                    simple_period = max(3, simple_period)  # 确保至少为3
+                    logger.info(f"尝试使用简化周期: {simple_period}")
+                    stl = STL(ts, seasonal=simple_period)
+                    result = stl.fit()
+                except Exception as e2:
+                    logger.error(f"简化STL分解也失败: {e2}")
+                    return {"error": f"STL分解失败: {str(e2)}"}
+            
+            # 构建结果，使用真实的日期索引
+            date_strings = [d.strftime('%Y-%m-%d') for d in ts.index]
             
             return {
-                "original": [{"date": str(dates[i]), "value": float(val)} for i, val in enumerate(ts_values)],
-                "trend": [{"date": str(dates[i]), "value": float(val)} for i, val in enumerate(result.trend.values)],
-                "seasonal": [{"date": str(dates[i]), "value": float(val)} for i, val in enumerate(result.seasonal.values)],
-                "resid": [{"date": str(dates[i]), "value": float(val)} for i, val in enumerate(result.resid.values)]
+                "original": [{"date": date_strings[i], "value": float(val)} for i, val in enumerate(ts.values)],
+                "trend": [{"date": date_strings[i], "value": float(val)} for i, val in enumerate(result.trend.values)],
+                "seasonal": [{"date": date_strings[i], "value": float(val)} for i, val in enumerate(result.seasonal.values)],
+                "resid": [{"date": date_strings[i], "value": float(val)} for i, val in enumerate(result.resid.values)]
             }
             
         except Exception as e:
             logger.error(f"STL分解失败: {e}")
+            import traceback
+            logger.error(f"STL分解详细错误: {traceback.format_exc()}")
             return {"error": str(e)}
     
     def get_filter_options(self):
         """获取筛选选项（企业、行业、问题分类）"""
         try:
             if self._data_cache is None or self._data_cache.empty:
-                return {"companies": [], "industries": [], "categories": []}
+                return {"companies": [], "industry_level1": [], "industry_level2": [], "industry_classification": [], "categories": []}
             
             companies = []
-            industries = []
+            industry_level1 = []  # 行业名称(1) - 大类
+            industry_level2 = []  # 行业名称(2) - 中类  
+            industry_classification = []  # 行业分类 - 详细分类
             categories = []
             
-            # 获取企业列表
+            # 获取企业列表（包含空值选项）
             if '企业名称' in self._data_cache.columns:
-                companies = self._data_cache['企业名称'].dropna().unique().tolist()
+                # 获取所有非空企业名称
+                non_null_companies = self._data_cache['企业名称'].dropna().unique().tolist()
+                companies.extend(sorted(non_null_companies))
+                
+                # 检查是否有空值，如果有则添加空值选项
+                null_count = self._data_cache['企业名称'].isnull().sum()
+                if null_count > 0:
+                    companies.append(f"[空值] ({null_count}条记录)")
             
-            # 获取行业列表
+            # 获取行业大类（行业名称1）
+            if '行业名称(1)' in self._data_cache.columns:
+                non_null_level1 = self._data_cache['行业名称(1)'].dropna().unique().tolist()
+                industry_level1.extend(sorted(non_null_level1))
+                
+                null_count = self._data_cache['行业名称(1)'].isnull().sum()
+                if null_count > 0:
+                    industry_level1.append(f"[空值] ({null_count}条记录)")
+            
+            # 获取行业中类（行业名称2）
+            if '行业名称(2)' in self._data_cache.columns:
+                non_null_level2 = self._data_cache['行业名称(2)'].dropna().unique().tolist()
+                industry_level2.extend(sorted(non_null_level2))
+                
+                null_count = self._data_cache['行业名称(2)'].isnull().sum()
+                if null_count > 0:
+                    industry_level2.append(f"[空值] ({null_count}条记录)")
+            
+            # 获取详细行业分类
             if '行业分类' in self._data_cache.columns:
-                industries = self._data_cache['行业分类'].dropna().unique().tolist()
+                non_null_classification = self._data_cache['行业分类'].dropna().unique().tolist()
+                industry_classification.extend(sorted(non_null_classification))
+                
+                null_count = self._data_cache['行业分类'].isnull().sum()
+                if null_count > 0:
+                    industry_classification.append(f"[空值] ({null_count}条记录)")
             
-            # 获取问题分类列表
+            # 获取问题分类列表（包含空值选项）
             if '问题分类' in self._data_cache.columns:
-                categories = self._data_cache['问题分类'].dropna().unique().tolist()
+                non_null_categories = self._data_cache['问题分类'].dropna().unique().tolist()
+                categories.extend(sorted(non_null_categories))
+                
+                null_count = self._data_cache['问题分类'].isnull().sum()
+                if null_count > 0:
+                    categories.append(f"[空值] ({null_count}条记录)")
+            
+            logger.info(f"筛选选项统计: 企业数={len(companies)}, 行业大类={len(industry_level1)}, 行业中类={len(industry_level2)}, 详细行业分类={len(industry_classification)}, 问题分类数={len(categories)}")
             
             return {
-                "companies": sorted(companies)[:100],  # 限制数量避免过多
-                "industries": sorted(industries),
-                "categories": sorted(categories)
+                "companies": companies,  # 显示全部值，不截断
+                "industry_level1": industry_level1,   # 行业大类
+                "industry_level2": industry_level2,   # 行业中类
+                "industry_classification": industry_classification,  # 详细行业分类
+                "categories": categories
             }
             
         except Exception as e:
             logger.error(f"获取筛选选项失败: {e}")
-            return {"companies": [], "industries": [], "categories": []}
+            return {"companies": [], "industry_level1": [], "industry_level2": [], "industry_classification": [], "categories": []}
 
-    def get_dashboard_stats(self, start_date=None, end_date=None, companies=None, industries=None, categories=None):
+    def get_dashboard_stats(self, start_date=None, end_date=None, companies=None, industries=None, categories=None, industry_level1=None, industry_level2=None):
         """获取仪表板统计数据"""
         try:
-            filtered_data = self._get_filtered_data_enhanced(start_date, end_date, companies, industries, categories)
+            filtered_data = self._get_filtered_data_enhanced(start_date, end_date, companies, industries, categories, industry_level1, industry_level2)
             
             if filtered_data.empty:
                 logger.warning("筛选后数据为空")
@@ -526,10 +694,10 @@ class Model:
             logger.error(f"获取仪表板统计失败: {e}")
             return {"error": str(e)}
     
-    def get_trend_data(self, start_date=None, end_date=None, period='day', companies=None, industries=None, categories=None):
+    def get_trend_data(self, start_date=None, end_date=None, period='day', companies=None, industries=None, categories=None, industry_level1=None, industry_level2=None):
         """获取投诉趋势数据"""
         try:
-            filtered_data = self._get_filtered_data_enhanced(start_date, end_date, companies, industries, categories)
+            filtered_data = self._get_filtered_data_enhanced(start_date, end_date, companies, industries, categories, industry_level1, industry_level2)
             
             if filtered_data.empty or '日期' not in filtered_data.columns:
                 return {"error": "没有有效的时间数据"}

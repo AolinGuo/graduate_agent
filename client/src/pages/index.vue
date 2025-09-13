@@ -3,8 +3,8 @@
     <!-- 头部标题和筛选区域 -->
     <div class="dashboard-header">
       <div class="title-section">
-        <h1>工商投诉数据分析系统</h1>
-        <p>实时投诉数据统计分析与趋势监控平台</p>
+        <h1>工商投诉可视分析系统</h1>
+        <p>AI赋能投诉数据统计分析平台</p>
       </div>
       
       <div class="filter-section">
@@ -74,16 +74,58 @@
             
             <!-- 分类筛选 -->
             <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="行业分类">
+              <el-col :span="8">
+                <el-form-item label="行业大类">
+                  <el-select
+                    v-model="filters.selectedIndustryLevel1"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    placeholder="选择行业大类"
+                    style="width: 100%"
+                    :max-collapse-tags="2"
+                    @change="loadDashboardData"
+                  >
+                    <el-option
+                      v-for="industry in filterOptions.industryLevel1"
+                      :key="industry"
+                      :label="industry"
+                      :value="industry"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="行业中类">
+                  <el-select
+                    v-model="filters.selectedIndustryLevel2"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    placeholder="选择行业中类"
+                    style="width: 100%"
+                    :max-collapse-tags="2"
+                    @change="loadDashboardData"
+                  >
+                    <el-option
+                      v-for="industry in filterOptions.industryLevel2"
+                      :key="industry"
+                      :label="industry"
+                      :value="industry"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="详细分类">
                   <el-select
                     v-model="filters.selectedIndustries"
                     multiple
                     collapse-tags
                     collapse-tags-tooltip
-                    placeholder="选择行业分类"
+                    placeholder="选择详细分类"
                     style="width: 100%"
-                    :max-collapse-tags="3"
+                    :max-collapse-tags="2"
                     @change="loadDashboardData"
                   >
                     <el-option
@@ -95,8 +137,11 @@
                   </el-select>
                 </el-form-item>
               </el-col>
-              
-              <el-col :span="12">
+            </el-row>
+            
+            <!-- 问题分类单独一行 -->
+            <el-row :gutter="20">
+              <el-col :span="24">
                 <el-form-item label="问题分类">
                   <el-select
                     v-model="filters.selectedCategories"
@@ -105,7 +150,7 @@
                     collapse-tags-tooltip
                     placeholder="选择问题分类"
                     style="width: 100%"
-                    :max-collapse-tags="3"
+                    :max-collapse-tags="5"
                     @change="loadDashboardData"
                   >
                     <el-option
@@ -288,15 +333,19 @@
           
           <!-- STL分解结果 -->
           <div v-if="timeSeriesResults.analysis.stl && !timeSeriesResults.analysis.stl.error" class="analysis-result">
-            <h4>STL季节性分解</h4>
-            <el-tabs>
-              <el-tab-pane label="趋势分量" name="trend">
-                <div ref="stlTrendChart" style="width: 100%; height: 250px;"></div>
-              </el-tab-pane>
-              <el-tab-pane label="季节分量" name="seasonal">
-                <div ref="stlSeasonalChart" style="width: 100%; height: 250px;"></div>
-              </el-tab-pane>
-            </el-tabs>
+            <h4>STL季节性分解（月周期）</h4>
+            
+            <!-- 趋势分量 -->
+            <div class="stl-chart-container">
+              <h5>趋势分量</h5>
+              <div ref="stlTrendChart" style="width: 100%; height: 280px; margin-bottom: 20px;"></div>
+            </div>
+            
+            <!-- 季节分量 -->
+            <div class="stl-chart-container">
+              <h5>季节分量</h5>
+              <div ref="stlSeasonalChart" style="width: 100%; height: 280px;"></div>
+            </div>
           </div>
         </div>
       </el-card>
@@ -340,13 +389,17 @@ const filters = ref({
   endDate: null,
   selectedCompanies: [],
   selectedIndustries: [],
-  selectedCategories: []
+  selectedCategories: [],
+  selectedIndustryLevel1: [],
+  selectedIndustryLevel2: []
 })
 
 const filterOptions = ref({
   companies: [],
   industries: [],
-  categories: []
+  categories: [],
+  industryLevel1: [],
+  industryLevel2: []
 })
 
 const dashboardStats = ref({
@@ -406,11 +459,19 @@ const initializeDashboard = async () => {
     
     // 设置筛选选项
     if (filterOptionsResponse.data) {
-      filterOptions.value = filterOptionsResponse.data
+      filterOptions.value = {
+        companies: filterOptionsResponse.data.companies || [],
+        industries: filterOptionsResponse.data.industry_classification || [], // 保持向后兼容
+        categories: filterOptionsResponse.data.categories || [],
+        industryLevel1: filterOptionsResponse.data.industry_level1 || [],
+        industryLevel2: filterOptionsResponse.data.industry_level2 || []
+      }
       console.log('筛选选项设置完成:', {
         companies: filterOptions.value.companies.length,
         industries: filterOptions.value.industries.length,
-        categories: filterOptions.value.categories.length
+        categories: filterOptions.value.categories.length,
+        industryLevel1: filterOptions.value.industryLevel1.length,
+        industryLevel2: filterOptions.value.industryLevel2.length
       })
     }
     
@@ -441,7 +502,9 @@ const loadDashboardData = async () => {
       end_date: filters.value.endDate,
       companies: filters.value.selectedCompanies.length > 0 ? filters.value.selectedCompanies : undefined,
       industries: filters.value.selectedIndustries.length > 0 ? filters.value.selectedIndustries : undefined,
-      categories: filters.value.selectedCategories.length > 0 ? filters.value.selectedCategories : undefined
+      categories: filters.value.selectedCategories.length > 0 ? filters.value.selectedCategories : undefined,
+      industry_level1: filters.value.selectedIndustryLevel1.length > 0 ? filters.value.selectedIndustryLevel1 : undefined,
+      industry_level2: filters.value.selectedIndustryLevel2.length > 0 ? filters.value.selectedIndustryLevel2 : undefined
     }
     
     console.log('加载仪表板数据，参数:', params)
@@ -478,7 +541,9 @@ const loadTrendData = async () => {
       period: trendPeriod.value,
       companies: filters.value.selectedCompanies.length > 0 ? filters.value.selectedCompanies : undefined,
       industries: filters.value.selectedIndustries.length > 0 ? filters.value.selectedIndustries : undefined,
-      categories: filters.value.selectedCategories.length > 0 ? filters.value.selectedCategories : undefined
+      categories: filters.value.selectedCategories.length > 0 ? filters.value.selectedCategories : undefined,
+      industry_level1: filters.value.selectedIndustryLevel1.length > 0 ? filters.value.selectedIndustryLevel1 : undefined,
+      industry_level2: filters.value.selectedIndustryLevel2.length > 0 ? filters.value.selectedIndustryLevel2 : undefined
     }
     
     console.log('加载趋势数据，参数:', params)
@@ -672,7 +737,12 @@ const performTimeSeriesAnalysis = async () => {
     const params = {
       start_date: filters.value.startDate,
       end_date: filters.value.endDate,
-      methods: ['acf', 'stl']
+      methods: ['acf', 'stl'],
+      companies: filters.value.selectedCompanies.length > 0 ? filters.value.selectedCompanies : undefined,
+      industries: filters.value.selectedIndustries.length > 0 ? filters.value.selectedIndustries : undefined,
+      categories: filters.value.selectedCategories.length > 0 ? filters.value.selectedCategories : undefined,
+      industry_level1: filters.value.selectedIndustryLevel1.length > 0 ? filters.value.selectedIndustryLevel1 : undefined,
+      industry_level2: filters.value.selectedIndustryLevel2.length > 0 ? filters.value.selectedIndustryLevel2 : undefined
     }
     
     console.log('执行时间序列分析，参数:', params)
@@ -1031,6 +1101,8 @@ const clearFilters = () => {
   filters.value.selectedCompanies = []
   filters.value.selectedIndustries = []
   filters.value.selectedCategories = []
+  filters.value.selectedIndustryLevel1 = []
+  filters.value.selectedIndustryLevel2 = []
   loadDashboardData()
   loadTrendData()
 }
@@ -1256,6 +1328,20 @@ onMounted(() => {
   color: #2c3e50;
   margin: 0 0 15px 0;
   font-size: 16px;
+}
+
+.stl-chart-container {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.stl-chart-container h5 {
+  color: #606266;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .analysis-info {

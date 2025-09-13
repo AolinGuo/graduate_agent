@@ -108,11 +108,22 @@ def analyze_time_series():
         start_date = data.get('start_date')
         end_date = data.get('end_date')
         methods = data.get('methods', ['acf', 'stl'])
+        companies = data.get('companies', [])
+        industries = data.get('industries', [])
+        categories = data.get('categories', [])
+        industry_level1 = data.get('industry_level1', [])
+        industry_level2 = data.get('industry_level2', [])
         
-        result = model.analyze_time_series(
+        # 使用增强的筛选数据进行时序分析
+        result = model.analyze_time_series_enhanced(
             start_date=start_date,
             end_date=end_date,
-            methods=methods
+            methods=methods,
+            companies=companies if companies else None,
+            industries=industries if industries else None,
+            categories=categories if categories else None,
+            industry_level1=industry_level1 if industry_level1 else None,
+            industry_level2=industry_level2 if industry_level2 else None
         )
         
         return jsonify(result)
@@ -162,11 +173,11 @@ def stl_decomposition():
             data = request.get_json()
             start_date = data.get('start_date')
             end_date = data.get('end_date')
-            seasonal = data.get('seasonal', 7)
+            seasonal = data.get('seasonal', 12)
         else:
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
-            seasonal = request.args.get('seasonal', 7, type=int)
+            seasonal = request.args.get('seasonal', 12, type=int)
         
         # 使用时序分析功能
         result = model.analyze_time_series(
@@ -231,23 +242,29 @@ def get_dashboard_stats():
             companies = data.get('companies', [])
             industries = data.get('industries', [])
             categories = data.get('categories', [])
+            industry_level1 = data.get('industry_level1', [])
+            industry_level2 = data.get('industry_level2', [])
         else:
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
             companies = request.args.getlist('companies')
             industries = request.args.getlist('industries')
             categories = request.args.getlist('categories')
+            industry_level1 = request.args.getlist('industry_level1')
+            industry_level2 = request.args.getlist('industry_level2')
         
         # 调试日志
         logger.info(f"仪表板统计请求参数: start_date={start_date}, end_date={end_date}")
-        logger.info(f"筛选条件: companies={len(companies) if companies else 0}, industries={len(industries) if industries else 0}, categories={len(categories) if categories else 0}")
+        logger.info(f"筛选条件: companies={len(companies) if companies else 0}, industries={len(industries) if industries else 0}, categories={len(categories) if categories else 0}, industry_level1={len(industry_level1) if industry_level1 else 0}, industry_level2={len(industry_level2) if industry_level2 else 0}")
         
         result = model.get_dashboard_stats(
             start_date=start_date,
             end_date=end_date,
             companies=companies if companies else None,
             industries=industries if industries else None,
-            categories=categories if categories else None
+            categories=categories if categories else None,
+            industry_level1=industry_level1 if industry_level1 else None,
+            industry_level2=industry_level2 if industry_level2 else None
         )
         
         logger.info(f"返回统计结果: {result}")
@@ -269,6 +286,8 @@ def get_trend_data():
             companies = data.get('companies', [])
             industries = data.get('industries', [])
             categories = data.get('categories', [])
+            industry_level1 = data.get('industry_level1', [])
+            industry_level2 = data.get('industry_level2', [])
         else:
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
@@ -276,6 +295,8 @@ def get_trend_data():
             companies = request.args.getlist('companies')
             industries = request.args.getlist('industries')
             categories = request.args.getlist('categories')
+            industry_level1 = request.args.getlist('industry_level1')
+            industry_level2 = request.args.getlist('industry_level2')
         
         result = model.get_trend_data(
             start_date=start_date,
@@ -283,7 +304,9 @@ def get_trend_data():
             period=period,
             companies=companies if companies else None,
             industries=industries if industries else None,
-            categories=categories if categories else None
+            categories=categories if categories else None,
+            industry_level1=industry_level1 if industry_level1 else None,
+            industry_level2=industry_level2 if industry_level2 else None
         )
         
         return jsonify(result)
