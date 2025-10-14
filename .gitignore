@@ -8,3 +8,5 @@ node_modules
 .idea/
 *.log
 .venv/
+server/model-dir/
+server/output
