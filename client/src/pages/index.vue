@@ -361,6 +361,87 @@
         :closable="false"
       />
     </div>
+
+    <!-- AI功能模块区域 -->
+    <div class="ai-modules-section">
+      <el-row :gutter="20">
+        <!-- AI报告生成模块 -->
+        <el-col :span="12">
+          <el-card class="ai-module-card chart-card" shadow="hover">
+            <template #header>
+              <div class="ai-module-header">
+                <span class="ai-module-title">
+                  <el-icon style="margin-right: 8px; color: #409eff;"><Document /></el-icon>
+                  AI报告生成
+                </span>
+              </div>
+            </template>
+            
+            <div class="ai-report-content">
+              <div class="report-text">
+                一、 摘要<br/><br/>
+                本报告基于2021年12月19日至2023年12月19日的投诉数据，对投诉总量、时间趋势、行业分布、问题类型及重点企业进行了多维度分析。分析发现，在此期间系统共收录<span class="highlight">8053条投诉</span>，涉及<span class="highlight">3312家企业</span>和<span class="highlight">99个行业</span>。投诉量在<span class="highlight">2023年1月达到峰值</span>，<span class="highlight">教育培训</span>和<span class="highlight">互联网</span>是投诉最为集中的行业，<span class="highlight">合同纠纷（消费）类</span>问题是最主要的投诉类型。报告针对性地提出了监管建议，以助力提升消费者权益保护工作的效能。<br/><br/>
+
+                二、 数据概况<br/><br/>
+                <b>分析时间范围</b>：2021年12月19日 - 2023年12月19日<br/>
+                <b>总投诉量</b>：8,053<br/>
+                <b>涉及企业数</b>：3,312<br/>
+                <b>涉及行业数</b>：99<br/>
+                <b>重复投诉企业数</b>：565（表明部分企业问题集中，未得到有效解决）<br/><br/>
+
+                三、 投诉趋势分析<br/><br/>
+                <b>月度趋势（显著波动与季节性高峰）</b><br/><br/>
+                整体投诉量呈现显著的<span class="highlight">波动性上升后回落</span>的趋势。从2021年12月的约120起，逐步攀升至2023年1月的超550起峰值，增长超过4倍。<br/><br/>
+                <b>关键时间点</b>：<br/>
+                <span class="highlight">2023年1月</span>：投诉量达到最高峰（>550），这可能与春节前消费旺季、年终促销及后续服务问题集中爆发有关。<br/>
+                <span class="highlight">2022年末至2023年初</span>：投诉量持续高位运行，2022年11月（520）、12月及2023年1月是投诉最为密集的时期。<br/><br/>
+
+                四、 行业分析<br/><br/>
+                <b>行业投诉集中度</b><br/>
+                <span class="highlight">教育培训</span>和<span class="highlight">互联网</span>是投诉的"重灾区"。在行业与问题交叉分析中，教育培训行业的投诉总量尤为突出，且主要集中在<span class="highlight">合同纠纷(消费)类</span>问题（如退费难、跑路等）。<br/><br/>
+
+                五、 结论与建议<br/><br/>
+                <b>建议</b>：<br/>
+                <span class="highlight">加强重点行业监管</span>：建议对<span class="highlight">教育培训</span>、<span class="highlight">互联网服务</span>和<span class="highlight">预付费消费</span>等领域开展专项治理行动，建立行业准入和资金监管机制，从源头减少合同纠纷。<br/>
+                <span class="highlight">关注关键时间节点</span>：在春节（年初）、国庆（年中）等消费旺季来临前，发布消费警示，加强市场巡查，防范群体性投诉事件的发生。
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        
+        <!-- AI辅助回复模块 -->
+        <el-col :span="12">
+          <el-card class="ai-module-card chart-card" shadow="hover">
+            <template #header>
+              <div class="ai-module-header">
+                <span class="ai-module-title">
+                  <el-icon style="margin-right: 8px; color: #67c23a;"><ChatDotSquare /></el-icon>
+                  AI辅助回复
+                </span>
+              </div>
+            </template>
+            
+            <div class="ai-assistant-content">
+              <!-- 输入示例区域 -->
+              <div class="input-section">
+                <h4>市民投诉内容：</h4>
+                <div class="complaint-example">
+                  市民反映，今年2022年4月19日的时候在北京欢乐水魔方公众号上购买的夏季的卡，当时购买的时候说随时可以退款，但是夏天因为一些原因没有过去游玩。当时说只要不开通就可以随时退款，自己没有开通，在公众号申请退款已经申请好几个月了，一直显示退款中，但是一直得不到处理。
+                </div>
+              </div>
+              
+              <!-- 输出回复区域 -->
+              <div class="output-section">
+                <h4>AI推荐回复：</h4>
+                <div class="reply-example">
+                  市场监督管理局执法人员电话联系诉求人核实其诉求并告知受理，请及时向来电人反馈办理情况。针对其反映的退费问题，经我所执法人员调解，被诉方同意为诉求人退还费用，诉求问题得到解决。
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
   </div>
 </template>
 
@@ -368,7 +449,8 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { 
-  Refresh, Document, OfficeBuilding, Grid, Warning, TrendCharts, RefreshLeft 
+  Refresh, Document, OfficeBuilding, Grid, Warning, TrendCharts, RefreshLeft,
+  ChatDotSquare
 } from '@element-plus/icons-vue'
 import { 
   getDashboardStats, 
@@ -1117,6 +1199,7 @@ const getPeriodLabel = () => {
   return labels[trendPeriod.value] || '按天'
 }
 
+
 // 组件挂载
 onMounted(() => {
   console.log('组件挂载，开始初始化...')
@@ -1350,6 +1433,114 @@ onMounted(() => {
   font-size: 14px;
 }
 
+/* AI功能模块样式 */
+.ai-modules-section {
+  margin-top: 30px;
+}
+
+.ai-module-card {
+  margin-bottom: 25px;
+}
+
+.ai-module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-module-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.ai-placeholder {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+/* AI报告样式 */
+.ai-report-content {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.report-meta {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.report-text {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  font-size: 14px;
+  border: 1px solid #e9ecef;
+}
+
+.report-text p {
+  margin: 0 0 12px 0;
+}
+
+.report-text .highlight {
+  color: #e74c3c;
+  font-weight: bold;
+  background: #fff3cd;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.report-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* AI辅助回复样式 */
+.ai-assistant-content {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.input-section h4,
+.output-section h4 {
+  color: #606266;
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.assistant-actions {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.output-section {
+  border-top: 1px solid #e4e7ed;
+  padding-top: 20px;
+}
+
+.reply-content {
+  margin-bottom: 15px;
+}
+
+.reply-textarea {
+  border-radius: 6px;
+}
+
+.reply-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .analysis-info {
   margin-bottom: 20px;
 }
@@ -1357,5 +1548,24 @@ onMounted(() => {
 .empty-ranking {
   padding: 40px 0;
   text-align: center;
+}
+
+/* 新增的示例内容样式 */
+.complaint-example, .reply-example {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  line-height: 1.6;
+  color: #495057;
+  font-size: 14px;
+}
+
+.complaint-example {
+  border-left: 4px solid #409eff;
+}
+
+.reply-example {
+  border-left: 4px solid #67c23a;
 }
 </style>
