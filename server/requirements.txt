@@ -38,3 +38,10 @@ tslearn==0.6.3
 
 # 系统工具
 six==1.16.0
+
+# AI模型相关
+torch>=2.0.0
+transformers>=4.35.0
+modelscope>=1.9.0
+peft>=0.7.0  # 用于加载LoRA权重
+accelerate>=0.24.0  # 模型加速库
