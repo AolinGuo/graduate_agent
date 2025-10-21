@@ -374,36 +374,44 @@
                   <el-icon style="margin-right: 8px; color: #409eff;"><Document /></el-icon>
                   AI报告生成
                 </span>
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="handleGenerateAIReport"
+                  :loading="aiReportLoading"
+                  :disabled="!filters.startDate || !filters.endDate">
+                  {{ aiReportLoading ? '生成中...' : '生成报告' }}
+                </el-button>
               </div>
             </template>
             
             <div class="ai-report-content">
-              <div class="report-text">
-                一、 摘要<br/><br/>
-                本报告基于2021年12月19日至2023年12月19日的投诉数据，对投诉总量、时间趋势、行业分布、问题类型及重点企业进行了多维度分析。分析发现，在此期间系统共收录<span class="highlight">8053条投诉</span>，涉及<span class="highlight">3312家企业</span>和<span class="highlight">99个行业</span>。投诉量在<span class="highlight">2023年1月达到峰值</span>，<span class="highlight">教育培训</span>和<span class="highlight">互联网</span>是投诉最为集中的行业，<span class="highlight">合同纠纷（消费）类</span>问题是最主要的投诉类型。报告针对性地提出了监管建议，以助力提升消费者权益保护工作的效能。<br/><br/>
-
-                二、 数据概况<br/><br/>
-                <b>分析时间范围</b>：2021年12月19日 - 2023年12月19日<br/>
-                <b>总投诉量</b>：8,053<br/>
-                <b>涉及企业数</b>：3,312<br/>
-                <b>涉及行业数</b>：99<br/>
-                <b>重复投诉企业数</b>：565（表明部分企业问题集中，未得到有效解决）<br/><br/>
-
-                三、 投诉趋势分析<br/><br/>
-                <b>月度趋势（显著波动与季节性高峰）</b><br/><br/>
-                整体投诉量呈现显著的<span class="highlight">波动性上升后回落</span>的趋势。从2021年12月的约120起，逐步攀升至2023年1月的超550起峰值，增长超过4倍。<br/><br/>
-                <b>关键时间点</b>：<br/>
-                <span class="highlight">2023年1月</span>：投诉量达到最高峰（>550），这可能与春节前消费旺季、年终促销及后续服务问题集中爆发有关。<br/>
-                <span class="highlight">2022年末至2023年初</span>：投诉量持续高位运行，2022年11月（520）、12月及2023年1月是投诉最为密集的时期。<br/><br/>
-
-                四、 行业分析<br/><br/>
-                <b>行业投诉集中度</b><br/>
-                <span class="highlight">教育培训</span>和<span class="highlight">互联网</span>是投诉的"重灾区"。在行业与问题交叉分析中，教育培训行业的投诉总量尤为突出，且主要集中在<span class="highlight">合同纠纷(消费)类</span>问题（如退费难、跑路等）。<br/><br/>
-
-                五、 结论与建议<br/><br/>
-                <b>建议</b>：<br/>
-                <span class="highlight">加强重点行业监管</span>：建议对<span class="highlight">教育培训</span>、<span class="highlight">互联网服务</span>和<span class="highlight">预付费消费</span>等领域开展专项治理行动，建立行业准入和资金监管机制，从源头减少合同纠纷。<br/>
-                <span class="highlight">关注关键时间节点</span>：在春节（年初）、国庆（年中）等消费旺季来临前，发布消费警示，加强市场巡查，防范群体性投诉事件的发生。
+              <div v-if="!aiReport && !aiReportLoading" class="ai-placeholder">
+                <el-icon :size="48" color="#c0c4cc"><Document /></el-icon>
+                <p>请选择时间范围后点击"生成报告"按钮</p>
+                <p style="font-size: 12px; color: #909399;">AI将根据当前筛选条件生成专业的分析报告</p>
+              </div>
+              
+              <div v-else-if="aiReportLoading" class="ai-placeholder">
+                <el-icon class="is-loading" :size="48" color="#409eff"><Loading /></el-icon>
+                <p>AI正在分析数据并生成报告...</p>
+                <p style="font-size: 12px; color: #909399;">这可能需要几秒钟时间</p>
+              </div>
+              
+              <div v-else>
+                <!-- AI思考过程 -->
+                <div v-if="aiReportThinking" class="thinking-section">
+                  <h4 style="color: #909399; font-size: 14px; margin-bottom: 10px;">
+                    <el-icon style="vertical-align: middle;"><View /></el-icon>
+                    AI思考过程：
+                  </h4>
+                  <div class="thinking-content">
+                    {{ aiReportThinking }}
+                  </div>
+                </div>
+                
+                <!-- AI生成的报告 -->
+                <div class="report-text" v-html="formatReportText(aiReport)"></div>
               </div>
             </div>
           </el-card>
@@ -422,19 +430,72 @@
             </template>
             
             <div class="ai-assistant-content">
-              <!-- 输入示例区域 -->
+              <!-- 输入区域 -->
               <div class="input-section">
                 <h4>市民投诉内容：</h4>
-                <div class="complaint-example">
-                  市民反映，今年2022年4月19日的时候在北京欢乐水魔方公众号上购买的夏季的卡，当时购买的时候说随时可以退款，但是夏天因为一些原因没有过去游玩。当时说只要不开通就可以随时退款，自己没有开通，在公众号申请退款已经申请好几个月了，一直显示退款中，但是一直得不到处理。
+                <el-input
+                  v-model="complaintInput"
+                  type="textarea"
+                  :rows="5"
+                  placeholder="请输入市民投诉内容..."
+                  class="complaint-textarea"
+                />
+                <div class="assistant-actions">
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    @click="handleGenerateAIReply"
+                    :loading="aiReplyLoading"
+                    :disabled="!complaintInput.trim()">
+                    {{ aiReplyLoading ? '生成中...' : '生成回复建议' }}
+                  </el-button>
+                  <el-button 
+                    size="small" 
+                    @click="handleUseExample">
+                    使用示例
+                  </el-button>
                 </div>
               </div>
               
               <!-- 输出回复区域 -->
-              <div class="output-section">
+              <div class="output-section" v-if="aiReply || aiReplyLoading">
                 <h4>AI推荐回复：</h4>
-                <div class="reply-example">
-                  市场监督管理局执法人员电话联系诉求人核实其诉求并告知受理，请及时向来电人反馈办理情况。针对其反映的退费问题，经我所执法人员调解，被诉方同意为诉求人退还费用，诉求问题得到解决。
+                
+                <div v-if="aiReplyLoading" class="ai-placeholder" style="padding: 20px;">
+                  <el-icon class="is-loading" :size="32" color="#67c23a"><Loading /></el-icon>
+                  <p style="margin-top: 10px;">AI正在生成回复建议...</p>
+                </div>
+                
+                <div v-else>
+                  <!-- AI思考过程 -->
+                  <div v-if="aiReplyThinking" class="thinking-section">
+                    <h4 style="color: #909399; font-size: 14px; margin-bottom: 10px;">
+                      <el-icon style="vertical-align: middle;"><View /></el-icon>
+                      AI思考过程：
+                    </h4>
+                    <div class="thinking-content">
+                      {{ aiReplyThinking }}
+                    </div>
+                  </div>
+                  
+                  <!-- AI生成的回复 -->
+                  <div class="reply-example">
+                    {{ aiReply }}
+                  </div>
+                </div>
+                
+                <div v-if="aiReply && !aiReplyLoading" class="reply-actions">
+                  <el-button 
+                    type="success" 
+                    size="small" 
+                    @click="handleCopyReply">
+                    复制回复
+                  </el-button>
+                  <el-button 
+                    size="small" 
+                    @click="handleClearReply">
+                    清除
+                  </el-button>
                 </div>
               </div>
             </div>
@@ -450,14 +511,16 @@ import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { 
   Refresh, Document, OfficeBuilding, Grid, Warning, TrendCharts, RefreshLeft,
-  ChatDotSquare
+  ChatDotSquare, Loading, View
 } from '@element-plus/icons-vue'
 import { 
   getDashboardStats, 
   getTrendData, 
   analyzeTimeSeries,
   getDataSummary,
-  getFilterOptions
+  getFilterOptions,
+  generateAIReport,
+  generateAIReply
 } from '@/stores/complaint-store'
 import * as d3 from 'd3'
 
@@ -465,6 +528,15 @@ import * as d3 from 'd3'
 const loading = ref(false)
 const trendLoading = ref(false)
 const analysisLoading = ref(false)
+
+// AI功能相关状态
+const aiReportLoading = ref(false)
+const aiReport = ref('')
+const aiReportThinking = ref('') // AI报告的思考过程
+const aiReplyLoading = ref(false)
+const aiReply = ref('')
+const aiReplyThinking = ref('') // AI回复的思考过程
+const complaintInput = ref('')
 
 const filters = ref({
   startDate: null,
@@ -1199,6 +1271,103 @@ const getPeriodLabel = () => {
   return labels[trendPeriod.value] || '按天'
 }
 
+// ========== AI功能相关函数 ==========
+
+// 生成AI报告
+const handleGenerateAIReport = async () => {
+  if (!filters.value.startDate || !filters.value.endDate) {
+    ElMessage.warning('请先选择时间范围')
+    return
+  }
+  
+  aiReportLoading.value = true
+  try {
+    const params = {
+      start_date: filters.value.startDate,
+      end_date: filters.value.endDate,
+      use_ai: true
+    }
+    
+    console.log('生成AI报告，参数:', params)
+    const response = await generateAIReport(params)
+    
+    if (response.data && response.data.success) {
+      aiReport.value = response.data.report
+      aiReportThinking.value = response.data.thinking || '' // 获取思考过程
+      console.log('AI报告生成成功，包含思考过程:', !!response.data.thinking)
+      ElMessage.success('AI报告生成成功')
+    } else {
+      throw new Error(response.data?.error || '报告生成失败')
+    }
+  } catch (error) {
+    console.error('生成AI报告失败:', error)
+    ElMessage.error('生成AI报告失败: ' + (error.response?.data?.error || error.message))
+  } finally {
+    aiReportLoading.value = false
+  }
+}
+
+// 生成AI回复
+const handleGenerateAIReply = async () => {
+  if (!complaintInput.value.trim()) {
+    ElMessage.warning('请输入投诉内容')
+    return
+  }
+  
+  aiReplyLoading.value = true
+  try {
+    const params = {
+      complaint_content: complaintInput.value
+    }
+    
+    console.log('生成AI回复，参数:', params)
+    const response = await generateAIReply(params)
+    
+    if (response.data && response.data.success) {
+      aiReply.value = response.data.reply
+      aiReplyThinking.value = response.data.thinking || '' // 获取思考过程
+      console.log('AI回复生成成功，包含思考过程:', !!response.data.thinking)
+      ElMessage.success('AI回复生成成功')
+    } else {
+      throw new Error(response.data?.error || '回复生成失败')
+    }
+  } catch (error) {
+    console.error('生成AI回复失败:', error)
+    ElMessage.error('生成AI回复失败: ' + (error.response?.data?.error || error.message))
+  } finally {
+    aiReplyLoading.value = false
+  }
+}
+
+// 使用示例投诉内容
+const handleUseExample = () => {
+  complaintInput.value = '市民反映，今年2022年4月19日的时候在北京欢乐水魔方公众号上购买的夏季的卡，当时购买的时候说随时可以退款，但是夏天因为一些原因没有过去游玩。当时说只要不开通就可以随时退款，自己没有开通，在公众号申请退款已经申请好几个月了，一直显示退款中，但是一直得不到处理。'
+  aiReply.value = ''
+}
+
+// 复制回复内容
+const handleCopyReply = () => {
+  if (aiReply.value) {
+    navigator.clipboard.writeText(aiReply.value).then(() => {
+      ElMessage.success('已复制到剪贴板')
+    }).catch(err => {
+      console.error('复制失败:', err)
+      ElMessage.error('复制失败，请手动复制')
+    })
+  }
+}
+
+// 清除回复
+const handleClearReply = () => {
+  aiReply.value = ''
+}
+
+// 格式化报告文本（将换行符转换为HTML）
+const formatReportText = (text) => {
+  if (!text) return ''
+  return text.replace(/\n/g, '<br/>')
+}
+
 
 // 组件挂载
 onMounted(() => {
@@ -1460,6 +1629,10 @@ onMounted(() => {
   color: #909399;
 }
 
+.ai-placeholder p {
+  margin: 10px 0;
+}
+
 /* AI报告样式 */
 .ai-report-content {
   max-height: 600px;
@@ -1561,11 +1734,51 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.complaint-textarea {
+  margin-bottom: 10px;
+}
+
 .complaint-example {
   border-left: 4px solid #409eff;
 }
 
 .reply-example {
   border-left: 4px solid #67c23a;
+}
+
+/* AI思考过程样式 */
+.thinking-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f0f9ff;
+  border-left: 4px solid #409eff;
+  border-radius: 6px;
+}
+
+.thinking-content {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  background: #fff;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.thinking-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 3px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
 }
 </style>

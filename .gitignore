@@ -10,3 +10,6 @@ node_modules
 .venv/
 server/model-dir/
 server/output
+server/checkpoint-375/
+server/output/
+LLaMA-Factory/

@@ -37,12 +37,12 @@ def main():
 
         # 启动配置
         host = os.getenv("HOST", "0.0.0.0")
-        port = int(os.getenv("PORT", 5000))
+        port = int(os.getenv("PORT", 8888))
         debug = os.getenv("DEBUG", "True").lower() == "true"
 
         logger.info(f"服务器配置: {host}:{port}, Debug: {debug}")
-        logger.info("API文档地址: http://localhost:5000/")
-        logger.info("健康检查: http://localhost:5000/health")
+        logger.info("API文档地址: http://localhost:8888/")
+        logger.info("健康检查: http://localhost:8888/health")
 
         print(f"📍 服务器地址: http://{host}:{port}")
         print(f"🔍 API接口: http://{host}:{port}/")

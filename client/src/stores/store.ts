@@ -9,7 +9,7 @@ import type { Commodity, Location, Vessel, VesselMovement } from '~/stores/type'
 
 // import { get } from 'node_modules/axios/index.cjs'
 
-const DATA_SERVER_URL = 'http://127.0.0.1:5000'
+const DATA_SERVER_URL = 'http://127.0.0.1:8888'
 
 type Callback<T> = (data: T) => void
 

@@ -59,13 +59,14 @@ def clean_structured_complaint_data(input_file, output_file):
             user_input = item.get("input", "")
             original_output = item.get("output", "")
 
-            # 构建用户查询
-            if instruction and user_input:
-                user_query = f"{instruction} {user_input}"
+            # 将input内容合并到instruction中，因为原数据中instruction都是空的
+            # 所以直接使用input作为instruction
+            if user_input:
+                user_query = user_input
             elif instruction:
                 user_query = instruction
             else:
-                user_query = user_input
+                user_query = ""
 
             # 清理重复内容
             cleaned_output = remove_duplicate_content(user_query, original_output)
@@ -74,13 +75,12 @@ def clean_structured_complaint_data(input_file, output_file):
                 cleaned_count += 1
                 print(f"✅ 已清理重复内容: {cleaned_output[:100]}...")
 
-            # 构建标准格式
+            # 构建标准格式 - 使用instruction/input/output/system格式
             training_example = {
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_query.strip()},
-                    {"role": "assistant", "content": cleaned_output.strip()},
-                ]
+                "instruction": user_query.strip(),
+                "input": "",  # 用户输入（选填），这里设为空
+                "output": cleaned_output.strip(),
+                "system": system_prompt,
             }
 
             cleaned_data.append(training_example)
@@ -90,10 +90,9 @@ def clean_structured_complaint_data(input_file, output_file):
             print(f"处理数据时出错: {e}")
             continue
 
-    # 保存清理后的数据
+    # 保存清理后的数据 - 使用JSON数组格式
     with open(output_file, "w", encoding="utf-8") as f:
-        for item in cleaned_data:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        json.dump(cleaned_data, f, ensure_ascii=False, indent=2)
 
     print("\n📊 处理完成!")
     print(f"处理数据: {processed_count} 条")
@@ -106,6 +105,6 @@ if __name__ == "__main__":
     # 处理完整数据集
     print("\n🔄 处理完整数据集...")
     input_file = "server/data/train_dataset.json"
-    output_file = "server/data/cleaned_training_data.jsonl"
+    output_file = "server/data/training_data_formatted.json"
 
     clean_structured_complaint_data(input_file, output_file)

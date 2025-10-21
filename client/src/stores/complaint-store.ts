@@ -5,10 +5,15 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
+// 定义类型
+interface ApiParams {
+  [key: string]: any
+}
+
 // 配置axios基础URL
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888',
+  timeout: 300000,  // 延长到300秒，适应AI模型加载和推理时间
   headers: {
     'Content-Type': 'application/json'
   }
@@ -57,7 +62,7 @@ export const getDataSummary = () => {
   return apiClient.get('/data/summary')
 }
 
-export const filterData = (params) => {
+export const filterData = (params: ApiParams) => {
   return apiClient.post('/data/filter', params)
 }
 
@@ -67,19 +72,19 @@ export const getDataFields = () => {
 
 // ============ 分析相关接口 ============
 
-export const analyzeTimeSeries = (params) => {
+export const analyzeTimeSeries = (params: ApiParams) => {
   return apiClient.post('/analysis/time-series', params)
 }
 
-export const performACFAnalysis = (params) => {
+export const performACFAnalysis = (params: ApiParams) => {
   return apiClient.post('/analysis/acf', params)
 }
 
-export const performSTLDecomposition = (params) => {
+export const performSTLDecomposition = (params: ApiParams) => {
   return apiClient.post('/analysis/stl', params)
 }
 
-export const generateReport = (params) => {
+export const generateReport = (params: ApiParams) => {
   return apiClient.post('/analysis/report', params)
 }
 
@@ -89,11 +94,11 @@ export const getFilterOptions = () => {
   return apiClient.get('/dashboard/filter-options')
 }
 
-export const getDashboardStats = (params) => {
+export const getDashboardStats = (params: ApiParams) => {
   return apiClient.post('/dashboard/stats', params)
 }
 
-export const getTrendData = (params) => {
+export const getTrendData = (params: ApiParams) => {
   return apiClient.post('/dashboard/trend', params)
 }
 
@@ -103,12 +108,26 @@ export const getAllEntities = () => {
   return apiClient.get('/get_all_entities')
 }
 
-export const getComplaintTimeSeries = (params) => {
+export const getComplaintTimeSeries = (params: ApiParams) => {
   return apiClient.post('/get_complaint_time_series', params)
 }
 
-export const getComplaintAnalysis = (params) => {
+export const getComplaintAnalysis = (params: ApiParams) => {
   return apiClient.post('/get_complaint_analysis', params)
+}
+
+// ============ AI功能相关接口 ============
+
+export const generateAIReport = (params: ApiParams) => {
+  return apiClient.post('/ai/report', params)
+}
+
+export const generateAIReply = (params: ApiParams) => {
+  return apiClient.post('/ai/reply', params)
+}
+
+export const getAIStatus = () => {
+  return apiClient.get('/ai/status')
 }
 
 // ============ Pinia Store ============
@@ -116,24 +135,24 @@ export const getComplaintAnalysis = (params) => {
 export const useComplaintStore = defineStore('complaint', {
   state: () => ({
     // 系统状态
-    systemData: null,
+    systemData: null as any,
     loading: false,
     
     // 数据状态
-    dataPreview: [],
+    dataPreview: [] as any[],
     totalRecords: 0,
-    dataFields: [],
+    dataFields: [] as any[],
     
     // 分析状态
-    analysisResults: null,
-    reportData: null,
+    analysisResults: null as any,
+    reportData: null as any,
     
     // 时间范围
-    dateInterval: ['2020-01-01', '2024-12-31'],
+    dateInterval: ['2020-01-01', '2024-12-31'] as string[],
     
     // 筛选条件
-    selectedEntities: [],
-    filterConditions: {}
+    selectedEntities: [] as any[],
+    filterConditions: {} as Record<string, any>
   }),
   
   getters: {
@@ -188,7 +207,7 @@ export const useComplaintStore = defineStore('complaint', {
     },
     
     // 执行时序分析
-    async performTimeSeriesAnalysis(params) {
+    async performTimeSeriesAnalysis(params: ApiParams) {
       this.loading = true
       try {
         const response = await analyzeTimeSeries(params)
@@ -203,7 +222,7 @@ export const useComplaintStore = defineStore('complaint', {
     },
     
     // 生成分析报告
-    async createReport(params) {
+    async createReport(params: ApiParams) {
       this.loading = true
       try {
         const response = await generateReport(params)
@@ -218,7 +237,7 @@ export const useComplaintStore = defineStore('complaint', {
     },
     
     // 通用HTTP GET请求
-    async get(api, callback = null) {
+    async get(api: string, callback: ((data: any) => void) | null = null) {
       try {
         const response = await apiClient.get(api)
         if (callback) callback(response.data)
@@ -230,7 +249,7 @@ export const useComplaintStore = defineStore('complaint', {
     },
     
     // 通用HTTP POST请求
-    async post(api, params, callback = null) {
+    async post(api: string, params: ApiParams, callback: ((data: any) => void) | null = null) {
       try {
         const response = await apiClient.post(api, params)
         if (callback) callback(response.data)

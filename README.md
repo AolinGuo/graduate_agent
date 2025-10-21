@@ -1,6 +1,22 @@
 
 # va-framework
 
+source /etc/profile.d/clash.sh
+proxy_on
+## Begin
+```bash
+cd server
+source .venv/bin/activate
+python run.py
+```
+
+```bash
+cd client
+pnpm i
+pnpm run dev
+```
+
+
 ## Client
 
 ```bash
@@ -36,6 +52,14 @@ pnpm run dev
 
 ```bash
 cd server
+source .venv/bin/activate
+python run.py
+```
+
+```bash
+cd server
+
+
 
 # Creating a Virtual Environment
 python3 -m venv .venv
@@ -63,11 +87,6 @@ nvidia-smi
 
 ```
 
-使用Swift框架训练模型
-官方提供的训练代码
-ms-swift介绍
-数据集格式
-Qwen3实践
 
 
 使用modelscope来下载模型
@@ -78,16 +97,12 @@ pip install modelscope
 ```
 
 
-您也可以使用ModelScope Python SDK下载模型，该方法支持断点续传和模型高速下载：
+使用ModelScope Python SDK下载模型，该方法支持断点续传和模型高速下载：
 ```python
 from modelscope import snapshot_download
 model_dir = snapshot_download("Qwen/Qwen2.5-0.5B-Instruct")
 ```
-由于模型都是通过Git存储，所以也可以在安装Git LFS后，通过git clone的方式在本地下载模型，例如：
-```bash
-git lfs install
-git clone https://www.modelscope.cn/Qwen/Qwen2.5-0.5B-Instruct.git
-```
+
 pipeline推理
 使用AutoModel加载模型
 ```bash

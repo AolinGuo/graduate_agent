@@ -97,7 +97,7 @@ pnpm run dev
 
 ### 3. 访问系统
 - 前端地址: http://localhost:3333
-- 后端API: http://localhost:5000
+- 后端API: http://localhost:8888
 
 ## 使用说明
 
