@@ -1,507 +1,419 @@
 <template>
   <div class="dashboard-container">
-    <!-- 头部标题和筛选区域 -->
-    <div class="dashboard-header">
-      <div class="title-section">
-        <h1>工商投诉可视分析系统</h1>
-        <p>AI赋能投诉数据统计分析平台</p>
-      </div>
-      
-      <div class="filter-section">
-        <el-card class="filter-card" shadow="never">
-          <el-form :model="filters" label-width="80px" size="small">
-            <!-- 时间筛选 -->
-            <el-row :gutter="20">
-              <el-col :span="6">
-                <el-form-item label="开始日期">
-                  <el-date-picker
-                    v-model="filters.startDate"
-                    type="date"
-                    placeholder="开始日期"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                    style="width: 100%"
-                    @change="loadDashboardData"
+    <!-- 主网格布局 -->
+    <div class="dashboard-grid">
+      <!-- 左上：控制台 -->
+      <div class="grid-item console-panel">
+        <el-card class="full-height-card" shadow="hover">
+          <template #header>
+            <div class="card-header-compact">
+              <span>控制台</span>
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="loadDashboardData" 
+                :loading="loading"
+                circle>
+                <el-icon><Refresh /></el-icon>
+              </el-button>
+            </div>
+          </template>
+          <div class="scrollable-content">
+            <el-form :model="filters" label-width="70px" size="small">
+              <el-form-item label="开始日期">
+                <el-date-picker
+                  v-model="filters.startDate"
+                  type="date"
+                  placeholder="开始日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                  @change="loadDashboardData"
+                />
+              </el-form-item>
+              
+              <el-form-item label="结束日期">
+                <el-date-picker
+                  v-model="filters.endDate"
+                  type="date"
+                  placeholder="结束日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                  @change="loadDashboardData"
+                />
+              </el-form-item>
+              
+              <el-form-item label="企业选择">
+                <el-select
+                  v-model="filters.selectedCompanies"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="选择企业"
+                  style="width: 100%"
+                  :max-collapse-tags="1"
+                  @change="loadDashboardData"
+                >
+                  <el-option
+                    v-for="company in filterOptions.companies"
+                    :key="company"
+                    :label="company"
+                    :value="company"
                   />
-                </el-form-item>
-              </el-col>
+                </el-select>
+              </el-form-item>
               
-              <el-col :span="6">
-                <el-form-item label="结束日期">
-                  <el-date-picker
-                    v-model="filters.endDate"
-                    type="date"
-                    placeholder="结束日期"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                    style="width: 100%"
-                    @change="loadDashboardData"
+              <el-form-item label="行业大类">
+                <el-select
+                  v-model="filters.selectedIndustryLevel1"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="选择行业大类"
+                  style="width: 100%"
+                  :max-collapse-tags="1"
+                  @change="loadDashboardData"
+                >
+                  <el-option
+                    v-for="industry in filterOptions.industryLevel1"
+                    :key="industry"
+                    :label="industry"
+                    :value="industry"
                   />
-                </el-form-item>
-              </el-col>
+                </el-select>
+              </el-form-item>
               
-              <el-col :span="6">
-                <el-form-item label="企业选择">
-                  <el-select
-                    v-model="filters.selectedCompanies"
-                    multiple
-                    collapse-tags
-                    collapse-tags-tooltip
-                    placeholder="选择企业"
-                    style="width: 100%"
-                    :max-collapse-tags="2"
-                    @change="loadDashboardData"
-                  >
-                    <el-option
-                      v-for="company in filterOptions.companies"
-                      :key="company"
-                      :label="company"
-                      :value="company"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
+              <el-form-item label="行业中类">
+                <el-select
+                  v-model="filters.selectedIndustryLevel2"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="选择行业中类"
+                  style="width: 100%"
+                  :max-collapse-tags="1"
+                  @change="loadDashboardData"
+                >
+                  <el-option
+                    v-for="industry in filterOptions.industryLevel2"
+                    :key="industry"
+                    :label="industry"
+                    :value="industry"
+                  />
+                </el-select>
+              </el-form-item>
               
-              <el-col :span="6">
-                <el-form-item>
-                  <el-button type="primary" @click="loadDashboardData" :loading="loading" style="width: 100%">
-                    <el-icon><Refresh /></el-icon>
-                    刷新数据
-                  </el-button>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            
-            <!-- 分类筛选 -->
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="行业大类">
-                  <el-select
-                    v-model="filters.selectedIndustryLevel1"
-                    multiple
-                    collapse-tags
-                    collapse-tags-tooltip
-                    placeholder="选择行业大类"
-                    style="width: 100%"
-                    :max-collapse-tags="2"
-                    @change="loadDashboardData"
-                  >
-                    <el-option
-                      v-for="industry in filterOptions.industryLevel1"
-                      :key="industry"
-                      :label="industry"
-                      :value="industry"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="行业中类">
-                  <el-select
-                    v-model="filters.selectedIndustryLevel2"
-                    multiple
-                    collapse-tags
-                    collapse-tags-tooltip
-                    placeholder="选择行业中类"
-                    style="width: 100%"
-                    :max-collapse-tags="2"
-                    @change="loadDashboardData"
-                  >
-                    <el-option
-                      v-for="industry in filterOptions.industryLevel2"
-                      :key="industry"
-                      :label="industry"
-                      :value="industry"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="详细分类">
-                  <el-select
-                    v-model="filters.selectedIndustries"
-                    multiple
-                    collapse-tags
-                    collapse-tags-tooltip
-                    placeholder="选择详细分类"
-                    style="width: 100%"
-                    :max-collapse-tags="2"
-                    @change="loadDashboardData"
-                  >
-                    <el-option
-                      v-for="industry in filterOptions.industries"
-                      :key="industry"
-                      :label="industry"
-                      :value="industry"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            
-            <!-- 问题分类单独一行 -->
-            <el-row :gutter="20">
-              <el-col :span="24">
-                <el-form-item label="问题分类">
-                  <el-select
-                    v-model="filters.selectedCategories"
-                    multiple
-                    collapse-tags
-                    collapse-tags-tooltip
-                    placeholder="选择问题分类"
-                    style="width: 100%"
-                    :max-collapse-tags="5"
-                    @change="loadDashboardData"
-                  >
-                    <el-option
-                      v-for="category in filterOptions.categories"
-                      :key="category"
-                      :label="category"
-                      :value="category"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            
-            <!-- 快速筛选按钮 -->
-            <el-row>
-              <el-col :span="24">
-                <el-form-item>
-                  <el-space>
-                    <el-button @click="clearFilters" size="small">
-                      <el-icon><RefreshLeft /></el-icon>
-                      重置筛选
-                    </el-button>
-                    <el-tag v-if="filters.selectedCompanies.length > 0" type="info" closable @close="filters.selectedCompanies = []; loadDashboardData()">
-                      已选企业: {{ filters.selectedCompanies.length }}个
-                    </el-tag>
-                    <el-tag v-if="filters.selectedIndustries.length > 0" type="success" closable @close="filters.selectedIndustries = []; loadDashboardData()">
-                      已选行业: {{ filters.selectedIndustries.length }}个
-                    </el-tag>
-                    <el-tag v-if="filters.selectedCategories.length > 0" type="warning" closable @close="filters.selectedCategories = []; loadDashboardData()">
-                      已选问题: {{ filters.selectedCategories.length }}个
-                    </el-tag>
-                  </el-space>
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-form>
+              <el-form-item label="详细分类">
+                <el-select
+                  v-model="filters.selectedIndustries"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="选择详细分类"
+                  style="width: 100%"
+                  :max-collapse-tags="1"
+                  @change="loadDashboardData"
+                >
+                  <el-option
+                    v-for="industry in filterOptions.industries"
+                    :key="industry"
+                    :label="industry"
+                    :value="industry"
+                  />
+                </el-select>
+              </el-form-item>
+              
+              <el-form-item label="问题分类">
+                <el-select
+                  v-model="filters.selectedCategories"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="选择问题分类"
+                  style="width: 100%"
+                  :max-collapse-tags="1"
+                  @change="loadDashboardData"
+                >
+                  <el-option
+                    v-for="category in filterOptions.categories"
+                    :key="category"
+                    :label="category"
+                    :value="category"
+                  />
+                </el-select>
+              </el-form-item>
+              
+              <el-form-item>
+                <el-button @click="clearFilters" size="small" style="width: 100%">
+                  <el-icon><RefreshLeft /></el-icon>
+                  重置筛选
+                </el-button>
+              </el-form-item>
+              
+              <div class="filter-tags">
+                <el-tag 
+                  v-if="filters.selectedCompanies.length > 0" 
+                  type="info" 
+                  size="small" 
+                  closable 
+                  @close="filters.selectedCompanies = []; loadDashboardData()">
+                  企业: {{ filters.selectedCompanies.length }}
+                </el-tag>
+                <el-tag 
+                  v-if="filters.selectedIndustries.length > 0" 
+                  type="success" 
+                  size="small" 
+                  closable 
+                  @close="filters.selectedIndustries = []; loadDashboardData()">
+                  行业: {{ filters.selectedIndustries.length }}
+                </el-tag>
+                <el-tag 
+                  v-if="filters.selectedCategories.length > 0" 
+                  type="warning" 
+                  size="small" 
+                  closable 
+                  @close="filters.selectedCategories = []; loadDashboardData()">
+                  问题: {{ filters.selectedCategories.length }}
+                </el-tag>
+              </div>
+            </el-form>
+          </div>
         </el-card>
       </div>
-    </div>
 
-    <!-- 统计指标卡片区域 -->
-    <div class="stats-section">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-card class="stat-card" shadow="hover">
-            <div class="stat-item">
-              <div class="stat-icon total-icon">
-                <el-icon size="24"><Document /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-value">{{ dashboardStats.total_complaints || 0 }}</div>
-                <div class="stat-label">投诉总量</div>
-              </div>
-          </div>
-          </el-card>
-        </el-col>
-        
-        <el-col :span="6">
-          <el-card class="stat-card" shadow="hover">
-            <div class="stat-item">
-              <div class="stat-icon company-icon">
-                <el-icon size="24"><OfficeBuilding /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-value">{{ dashboardStats.companies_count || 0 }}</div>
-                <div class="stat-label">涉及企业数</div>
-              </div>
+      <!-- 右上：时序分析 -->
+      <div class="grid-item timeseries-panel">
+        <el-card class="full-height-card" shadow="hover">
+          <template #header>
+            <div class="card-header-compact">
+              <span>时间序列分析</span>
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="performTimeSeriesAnalysis" 
+                :loading="analysisLoading">
+                执行分析
+              </el-button>
             </div>
-          </el-card>
-          </el-col>
-        
-        <el-col :span="6">
-          <el-card class="stat-card" shadow="hover">
-            <div class="stat-item">
-              <div class="stat-icon industry-icon">
-                <el-icon size="24"><Grid /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-value">{{ dashboardStats.industries_count || 0 }}</div>
-                <div class="stat-label">涉及行业数</div>
-    </div>
+          </template>
+          <div class="scrollable-content">
+            <div v-if="!timeSeriesResults && !analysisLoading" class="empty-state">
+              <el-icon :size="40" color="#c0c4cc"><TrendCharts /></el-icon>
+              <p>点击"执行分析"查看时序分析结果</p>
             </div>
-          </el-card>
-        </el-col>
-        
-        <el-col :span="6">
-          <el-card class="stat-card" shadow="hover">
-            <div class="stat-item">
-              <div class="stat-icon repeat-icon">
-                <el-icon size="24"><Warning /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-value">{{ dashboardStats.repeat_companies_count || 0 }}</div>
-                <div class="stat-label">月内重复投诉企业数</div>
-              </div>
+            
+            <div v-if="analysisLoading" class="empty-state">
+              <el-icon class="is-loading" :size="40" color="#409eff"><Loading /></el-icon>
+              <p>分析中...</p>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 主要内容区域 -->
-    <div class="main-content">
-      <el-row :gutter="20">
-        <!-- 投诉趋势图表 -->
-        <el-col :span="16">
-          <el-card class="chart-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>投诉趋势分析</span>
-                <div class="period-selector">
-                  <el-radio-group v-model="trendPeriod" size="small" @change="loadTrendData">
-                    <el-radio-button label="day">按天</el-radio-button>
-                    <el-radio-button label="week">按周</el-radio-button>
-                    <el-radio-button label="month">按月</el-radio-button>
-                  </el-radio-group>
+            
+            <div v-if="timeSeriesResults && !analysisLoading">
+              <!-- ACF分析结果 -->
+              <div v-if="timeSeriesResults.analysis.acf && !timeSeriesResults.analysis.acf.error" class="analysis-result-compact">
+                <h5>ACF自相关分析</h5>
+                <div ref="acfChart" style="width: 100%; height: 180px;"></div>
+              </div>
+              
+              <!-- STL分解结果 -->
+              <div v-if="timeSeriesResults.analysis.stl && !timeSeriesResults.analysis.stl.error" class="analysis-result-compact">
+                <h5>STL季节性分解</h5>
+                <div class="stl-compact">
+                  <p class="stl-label">趋势分量</p>
+                  <div ref="stlTrendChart" style="width: 100%; height: 140px;"></div>
+                </div>
+                <div class="stl-compact">
+                  <p class="stl-label">季节分量</p>
+                  <div ref="stlSeasonalChart" style="width: 100%; height: 140px;"></div>
                 </div>
               </div>
-            </template>
-            <div v-loading="trendLoading" style="position: relative;">
-              <div ref="trendChart" style="width: 100%; height: 400px;"></div>
             </div>
-          </el-card>
-        </el-col>
-        
-        <!-- 企业投诉排名 -->
-        <el-col :span="8">
-          <el-card class="ranking-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>企业投诉量排名</span>
-                <el-tag type="info" size="small">TOP 10</el-tag>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 中下：趋势图 + 统计指标 + 企业排名 -->
+      <div class="grid-item combined-panel">
+        <el-card class="full-height-card" shadow="hover">
+          <template #header>
+            <div class="card-header-compact">
+              <span>趋势图以及企业投诉排名</span>
+              <el-radio-group v-model="trendPeriod" size="small" @change="loadTrendData">
+                <el-radio-button label="day">按天</el-radio-button>
+                <el-radio-button label="week">按周</el-radio-button>
+                <el-radio-button label="month">按月</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
+          
+          <div class="combined-content">
+            <!-- 左侧：统计指标 -->
+            <div class="stats-sidebar">
+              <div class="stat-item-vertical total-stat">
+                <el-icon size="16"><Document /></el-icon>
+                <div class="stat-content-vertical">
+                  <div class="stat-value-vertical">{{ dashboardStats.total_complaints || 0 }}</div>
+                  <div class="stat-label-vertical">投诉总量</div>
+                </div>
               </div>
-            </template>
-            <div v-loading="loading">
-              <div class="ranking-list">
+              <div class="stat-item-vertical company-stat">
+                <el-icon size="16"><OfficeBuilding /></el-icon>
+                <div class="stat-content-vertical">
+                  <div class="stat-value-vertical">{{ dashboardStats.companies_count || 0 }}</div>
+                  <div class="stat-label-vertical">涉及企业数</div>
+                </div>
+              </div>
+              <div class="stat-item-vertical industry-stat">
+                <el-icon size="16"><Grid /></el-icon>
+                <div class="stat-content-vertical">
+                  <div class="stat-value-vertical">{{ dashboardStats.industries_count || 0 }}</div>
+                  <div class="stat-label-vertical">涉及行业数</div>
+                </div>
+              </div>
+              <div class="stat-item-vertical repeat-stat">
+                <el-icon size="16"><Warning /></el-icon>
+                <div class="stat-content-vertical">
+                  <div class="stat-value-vertical">{{ dashboardStats.repeat_companies_count || 0 }}</div>
+                  <div class="stat-label-vertical">月内重复投诉企业</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 中间：趋势图 -->
+            <div class="trend-section">
+              <div v-loading="trendLoading" class="trend-chart-wrapper">
+                <div ref="trendChart" style="width: 100%; height: 100%;"></div>
+              </div>
+            </div>
+            
+            <!-- 右侧：企业排名 -->
+            <div class="ranking-section">
+              <div class="ranking-header">
+                <span>企业投诉量排名</span>
+                <el-tag type="info" size="small">全部企业</el-tag>
+              </div>
+              <div v-loading="loading" class="ranking-list-compact">
                 <div 
                   v-for="(item, index) in dashboardStats.company_ranking || []" 
                   :key="index"
-                  class="ranking-item"
+                  class="ranking-item-compact"
                   :class="getRankingClass(index)"
                 >
-                  <div class="rank-number">{{ index + 1 }}</div>
-                  <div class="company-info">
-                    <div class="company-name" :title="item.name">{{ item.name }}</div>
-                    <div class="complaint-count">{{ item.count }} 件投诉</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-if="(!dashboardStats.company_ranking || dashboardStats.company_ranking.length === 0) && !loading" class="empty-ranking">
-                <el-empty description="暂无数据" :image-size="80"></el-empty>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 时间序列分析区域 -->
-    <div class="analysis-section">
-      <el-card class="analysis-card" shadow="hover">
-        <template #header>
-          <div class="card-header">
-            <span>时间序列分析</span>
-            <el-button type="text" @click="performTimeSeriesAnalysis" :loading="analysisLoading">
-              <el-icon><TrendCharts /></el-icon>
-              执行分析
-            </el-button>
-          </div>
-        </template>
-        
-        <div v-if="timeSeriesResults">
-          <!-- ACF分析结果 -->
-          <div v-if="timeSeriesResults.analysis.acf && !timeSeriesResults.analysis.acf.error" class="analysis-result">
-            <h4>ACF自相关分析</h4>
-            <p class="analysis-info">置信区间: ±{{ timeSeriesResults.analysis.acf.confidence_interval?.toFixed(4) }}</p>
-            <div ref="acfChart" style="width: 100%; height: 300px;"></div>
-          </div>
-          
-          <!-- STL分解结果 -->
-          <div v-if="timeSeriesResults.analysis.stl && !timeSeriesResults.analysis.stl.error" class="analysis-result">
-            <h4>STL季节性分解（月周期）</h4>
-            
-            <!-- 趋势分量 -->
-            <div class="stl-chart-container">
-              <h5>趋势分量</h5>
-              <div ref="stlTrendChart" style="width: 100%; height: 280px; margin-bottom: 20px;"></div>
-            </div>
-            
-            <!-- 季节分量 -->
-            <div class="stl-chart-container">
-              <h5>季节分量</h5>
-              <div ref="stlSeasonalChart" style="width: 100%; height: 280px;"></div>
-            </div>
-          </div>
-        </div>
-      </el-card>
-    </div>
-
-    <!-- 分析说明 -->
-    <div class="analysis-info" v-if="timeSeriesResults || analysisLoading">
-      <el-alert
-        title="时间序列分析"
-        description="以下图表显示投诉数据的自相关性分析和季节性分解结果"
-        type="info"
-        show-icon
-        :closable="false"
-      />
-    </div>
-
-    <!-- AI功能模块区域 -->
-    <div class="ai-modules-section">
-      <el-row :gutter="20">
-        <!-- AI报告生成模块 -->
-        <el-col :span="12">
-          <el-card class="ai-module-card chart-card" shadow="hover">
-            <template #header>
-              <div class="ai-module-header">
-                <span class="ai-module-title">
-                  <el-icon style="margin-right: 8px; color: #409eff;"><Document /></el-icon>
-                  AI报告生成
-                </span>
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="handleGenerateAIReport"
-                  :loading="aiReportLoading"
-                  :disabled="!filters.startDate || !filters.endDate">
-                  {{ aiReportLoading ? '生成中...' : '生成报告' }}
-                </el-button>
-              </div>
-            </template>
-            
-            <div class="ai-report-content">
-              <div v-if="!aiReport && !aiReportLoading" class="ai-placeholder">
-                <el-icon :size="48" color="#c0c4cc"><Document /></el-icon>
-                <p>请选择时间范围后点击"生成报告"按钮</p>
-                <p style="font-size: 12px; color: #909399;">AI将根据当前筛选条件生成专业的分析报告</p>
-              </div>
-              
-              <div v-else-if="aiReportLoading" class="ai-placeholder">
-                <el-icon class="is-loading" :size="48" color="#409eff"><Loading /></el-icon>
-                <p>AI正在分析数据并生成报告...</p>
-                <p style="font-size: 12px; color: #909399;">这可能需要几秒钟时间</p>
-              </div>
-              
-              <div v-else>
-                <!-- AI思考过程 -->
-                <div v-if="aiReportThinking" class="thinking-section">
-                  <h4 style="color: #909399; font-size: 14px; margin-bottom: 10px;">
-                    <el-icon style="vertical-align: middle;"><View /></el-icon>
-                    AI思考过程：
-                  </h4>
-                  <div class="thinking-content">
-                    {{ aiReportThinking }}
+                  <div class="rank-number-compact">{{ index + 1 }}</div>
+                  <div class="company-info-compact">
+                    <div class="company-name-compact" :title="item.name">{{ item.name }}</div>
+                    <div class="complaint-count-compact">{{ item.count }} 件</div>
                   </div>
                 </div>
                 
-                <!-- AI生成的报告 -->
-                <div class="report-text" v-html="formatReportText(aiReport)"></div>
+                <div v-if="(!dashboardStats.company_ranking || dashboardStats.company_ranking.length === 0) && !loading" class="empty-state">
+                  <el-empty description="暂无数据" :image-size="60"></el-empty>
+                </div>
               </div>
             </div>
-          </el-card>
-        </el-col>
-        
-        <!-- AI辅助回复模块 -->
-        <el-col :span="12">
-          <el-card class="ai-module-card chart-card" shadow="hover">
-            <template #header>
-              <div class="ai-module-header">
-                <span class="ai-module-title">
-                  <el-icon style="margin-right: 8px; color: #67c23a;"><ChatDotSquare /></el-icon>
-                  AI辅助回复
-                </span>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 右下：AI功能（标签切换） -->
+      <div class="grid-item ai-panel">
+        <el-card class="full-height-card" shadow="hover">
+          <template #header>
+            <div class="card-header-compact">
+              <span>AI智能助手</span>
+            </div>
+          </template>
+          <el-tabs v-model="activeAITab" class="ai-tabs">
+            <!-- AI报告生成 -->
+            <el-tab-pane label="报告生成" name="report">
+              <div class="ai-tab-content">
+                <div class="ai-action-bar">
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    @click="handleGenerateAIReport"
+                    :loading="aiReportLoading"
+                    :disabled="!filters.startDate || !filters.endDate"
+                    style="width: 100%">
+                    {{ aiReportLoading ? '生成中...' : '生成AI报告' }}
+                  </el-button>
+                </div>
+                
+                <div class="ai-output-area">
+                  <div v-if="!aiReport && !aiReportLoading" class="empty-state">
+                    <el-icon :size="40" color="#c0c4cc"><Document /></el-icon>
+                    <p>点击按钮生成AI分析报告</p>
+                  </div>
+                  
+                  <div v-else-if="aiReportLoading" class="empty-state">
+                    <el-icon class="is-loading" :size="40" color="#409eff"><Loading /></el-icon>
+                    <p>AI正在生成报告...</p>
+                  </div>
+                  
+                  <div v-else class="ai-result-content">
+                    <div v-if="aiReportThinking" class="thinking-section-compact">
+                      <el-icon><View /></el-icon> <span class="thinking-label">思考过程</span>
+                      <div class="thinking-content-compact">{{ aiReportThinking }}</div>
+                    </div>
+                    <div class="report-text-compact" v-html="formatReportText(aiReport)"></div>
+                  </div>
+                </div>
               </div>
-            </template>
+            </el-tab-pane>
             
-            <div class="ai-assistant-content">
-              <!-- 输入区域 -->
-              <div class="input-section">
-                <h4>市民投诉内容：</h4>
+            <!-- AI辅助回复 -->
+            <el-tab-pane label="辅助回复" name="reply">
+              <div class="ai-tab-content">
                 <el-input
                   v-model="complaintInput"
                   type="textarea"
-                  :rows="5"
+                  :rows="3"
                   placeholder="请输入市民投诉内容..."
-                  class="complaint-textarea"
+                  class="complaint-input-compact"
                 />
-                <div class="assistant-actions">
+                
+                <div class="ai-action-bar">
                   <el-button 
                     type="primary" 
                     size="small" 
                     @click="handleGenerateAIReply"
                     :loading="aiReplyLoading"
                     :disabled="!complaintInput.trim()">
-                    {{ aiReplyLoading ? '生成中...' : '生成回复建议' }}
+                    生成回复
                   </el-button>
                   <el-button 
                     size="small" 
                     @click="handleUseExample">
                     使用示例
                   </el-button>
-                </div>
-              </div>
-              
-              <!-- 输出回复区域 -->
-              <div class="output-section" v-if="aiReply || aiReplyLoading">
-                <h4>AI推荐回复：</h4>
-                
-                <div v-if="aiReplyLoading" class="ai-placeholder" style="padding: 20px;">
-                  <el-icon class="is-loading" :size="32" color="#67c23a"><Loading /></el-icon>
-                  <p style="margin-top: 10px;">AI正在生成回复建议...</p>
-                </div>
-                
-                <div v-else>
-                  <!-- AI思考过程 -->
-                  <div v-if="aiReplyThinking" class="thinking-section">
-                    <h4 style="color: #909399; font-size: 14px; margin-bottom: 10px;">
-                      <el-icon style="vertical-align: middle;"><View /></el-icon>
-                      AI思考过程：
-                    </h4>
-                    <div class="thinking-content">
-                      {{ aiReplyThinking }}
-                    </div>
-                  </div>
-                  
-                  <!-- AI生成的回复 -->
-                  <div class="reply-example">
-                    {{ aiReply }}
-                  </div>
-                </div>
-                
-                <div v-if="aiReply && !aiReplyLoading" class="reply-actions">
                   <el-button 
+                    v-if="aiReply"
                     type="success" 
                     size="small" 
                     @click="handleCopyReply">
-                    复制回复
-                  </el-button>
-                  <el-button 
-                    size="small" 
-                    @click="handleClearReply">
-                    清除
+                    复制
                   </el-button>
                 </div>
+                
+                <div class="ai-output-area" v-if="aiReply || aiReplyLoading">
+                  <div v-if="aiReplyLoading" class="empty-state">
+                    <el-icon class="is-loading" :size="40" color="#67c23a"><Loading /></el-icon>
+                    <p>AI正在生成回复...</p>
+                  </div>
+                  
+                  <div v-else class="ai-result-content">
+                    <div v-if="aiReplyThinking" class="thinking-section-compact">
+                      <el-icon><View /></el-icon> <span class="thinking-label">思考过程</span>
+                      <div class="thinking-content-compact">{{ aiReplyThinking }}</div>
+                    </div>
+                    <div class="reply-text-compact">{{ aiReply }}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+            </el-tab-pane>
+          </el-tabs>
+        </el-card>
+      </div>
     </div>
   </div>
 </template>
@@ -530,6 +442,7 @@ const trendLoading = ref(false)
 const analysisLoading = ref(false)
 
 // AI功能相关状态
+const activeAITab = ref('report')
 const aiReportLoading = ref(false)
 const aiReport = ref('')
 const aiReportThinking = ref('') // AI报告的思考过程
@@ -742,9 +655,9 @@ const renderTrendChart = () => {
   // 清除之前的图表
   d3.select(container).selectAll("*").remove()
   
-  const margin = { top: 40, right: 30, bottom: 40, left: 50 }
+  const margin = { top: 20, right: 30, bottom: 30, left: 50 }
   const width = container.offsetWidth - margin.left - margin.right
-  const height = 400 - margin.top - margin.bottom
+  const height = container.offsetHeight - margin.top - margin.bottom
   
   const svg = d3.select(container)
     .append("svg")
@@ -752,16 +665,6 @@ const renderTrendChart = () => {
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`)
-  
-  // 添加标题
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", -10)
-    .attr("text-anchor", "middle")
-    .style("font-size", "16px")
-    .style("font-weight", "600")
-    .style("fill", "#2c3e50")
-    .text(`投诉数量趋势 (${getPeriodLabel()})`)
   
   // 设置比例尺
   const xScale = d3.scaleBand()
@@ -853,19 +756,102 @@ const renderTrendChart = () => {
       d3.select(this).attr("r", 4)
     })
   
-  // 添加X轴
+  // 添加X轴 - 根据时间粒度智能控制显示
+  const dataLength = trendData.value.length
+  let tickValues = []
+  let tickFormat = d => d
+  const maxTicks = 10  // 固定显示10个刻度
+  
+  if (trendPeriod.value === 'month') {
+    // 按月：固定显示10个刻度
+    if (dataLength <= maxTicks) {
+      tickValues = trendData.value.map(d => d.time)
+    } else {
+      const interval = Math.floor(dataLength / maxTicks)
+      tickValues = trendData.value.filter((d, i) => i % interval === 0).map(d => d.time)
+      const lastTime = trendData.value[dataLength - 1].time
+      if (!tickValues.includes(lastTime)) {
+        tickValues.push(lastTime)
+      }
+    }
+    tickFormat = d => {
+      // 格式为 2025.03
+      const match = d.match(/(\d{4})[-年](\d{1,2})/)
+      if (match) {
+        const year = match[1]
+        const month = match[2].padStart(2, '0')
+        return `${year}.${month}`
+      }
+      return d
+    }
+  } else if (trendPeriod.value === 'week') {
+    // 按周：固定显示10个刻度
+    if (dataLength <= maxTicks) {
+      tickValues = trendData.value.map(d => d.time)
+    } else {
+      const interval = Math.floor(dataLength / maxTicks)
+      tickValues = trendData.value.filter((d, i) => i % interval === 0).map(d => d.time)
+      const lastTime = trendData.value[dataLength - 1].time
+      if (!tickValues.includes(lastTime)) {
+        tickValues.push(lastTime)
+      }
+    }
+    
+    tickFormat = d => {
+      // 尝试从周数据中提取日期，格式为 2025.09.28
+      const dateMatch = d.match(/(\d{4})-(\d{2})-(\d{2})/)
+      if (dateMatch) {
+        return `${dateMatch[1]}.${dateMatch[2]}.${dateMatch[3]}`
+      }
+      // 如果只是"第XX周"，返回简短格式
+      const weekMatch = d.match(/第(\d+)周/)
+      if (weekMatch) {
+        return `W${weekMatch[1]}`
+      }
+      return d
+    }
+  } else {
+    // 按天：固定显示10个刻度，带年份
+    if (dataLength <= maxTicks) {
+      tickValues = trendData.value.map(d => d.time)
+    } else {
+      const interval = Math.floor(dataLength / maxTicks)
+      tickValues = trendData.value.filter((d, i) => i % interval === 0).map(d => d.time)
+      const lastTime = trendData.value[dataLength - 1].time
+      if (!tickValues.includes(lastTime)) {
+        tickValues.push(lastTime)
+      }
+    }
+    
+    tickFormat = d => {
+      // 日期格式：YYYY.MM.DD（带年份）
+      const match = d.match(/(\d{4})[-年](\d{1,2})[-月](\d{1,2})/)
+      if (match) {
+        const year = match[1]
+        const month = match[2].padStart(2, '0')
+        const day = match[3].padStart(2, '0')
+        return `${year}.${month}.${day}`
+      }
+      return d
+    }
+  }
+  
+  // X轴不倾斜，水平显示
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(xScale))
+    .call(d3.axisBottom(xScale)
+      .tickValues(tickValues)
+      .tickFormat(tickFormat))
     .selectAll("text")
-    .style("text-anchor", "end")
-    .attr("dx", "-.8em")
-    .attr("dy", ".15em")
-    .attr("transform", "rotate(-45)")
+    .style("text-anchor", "middle")
+    .style("font-size", "8px")
+    .attr("dy", "0.8em")
   
   // 添加Y轴
   svg.append("g")
     .call(d3.axisLeft(yScale))
+    .selectAll("text")
+    .style("font-size", "11px")
   
   // 添加Y轴标签
   svg.append("text")
@@ -874,7 +860,7 @@ const renderTrendChart = () => {
     .attr("x", 0 - (height / 2))
     .attr("dy", "1em")
     .style("text-anchor", "middle")
-    .style("font-size", "12px")
+    .style("font-size", "11px")
     .style("fill", "#666")
     .text("投诉数量")
 }
@@ -933,37 +919,66 @@ const renderAnalysisCharts = () => {
   
   console.log('渲染分析图表，分析结果:', timeSeriesResults.value.analysis)
   
-  // 渲染ACF图表
-  if (timeSeriesResults.value.analysis.acf && !timeSeriesResults.value.analysis.acf.error && acfChart.value) {
-    console.log('渲染ACF图表')
-    renderACFChart()
-  } else if (timeSeriesResults.value.analysis.acf && timeSeriesResults.value.analysis.acf.error) {
-    console.error('ACF分析错误:', timeSeriesResults.value.analysis.acf.error)
-  }
-  
-  // 渲染STL分解图表
-  if (timeSeriesResults.value.analysis.stl && !timeSeriesResults.value.analysis.stl.error) {
-    console.log('渲染STL分解图表')
-    renderSTLCharts()
-  } else if (timeSeriesResults.value.analysis.stl && timeSeriesResults.value.analysis.stl.error) {
-    console.error('STL分解错误:', timeSeriesResults.value.analysis.stl.error)
-  }
+  // 延迟渲染，确保DOM完全更新和容器尺寸正确
+  setTimeout(() => {
+    // 渲染ACF图表
+    if (timeSeriesResults.value.analysis.acf && !timeSeriesResults.value.analysis.acf.error && acfChart.value) {
+      console.log('渲染ACF图表，容器尺寸:', {
+        width: acfChart.value.offsetWidth,
+        height: acfChart.value.offsetHeight
+      })
+      renderACFChart()
+    } else if (timeSeriesResults.value.analysis.acf && timeSeriesResults.value.analysis.acf.error) {
+      console.error('ACF分析错误:', timeSeriesResults.value.analysis.acf.error)
+    }
+    
+    // 渲染STL分解图表
+    if (timeSeriesResults.value.analysis.stl && !timeSeriesResults.value.analysis.stl.error) {
+      console.log('渲染STL分解图表')
+      if (stlTrendChart.value && stlSeasonalChart.value) {
+        console.log('STL容器尺寸:', {
+          trendWidth: stlTrendChart.value.offsetWidth,
+          trendHeight: stlTrendChart.value.offsetHeight,
+          seasonalWidth: stlSeasonalChart.value.offsetWidth,
+          seasonalHeight: stlSeasonalChart.value.offsetHeight
+        })
+      }
+      renderSTLCharts()
+    } else if (timeSeriesResults.value.analysis.stl && timeSeriesResults.value.analysis.stl.error) {
+      console.error('STL分解错误:', timeSeriesResults.value.analysis.stl.error)
+    }
+  }, 100)
 }
 
 // 渲染ACF图表
 const renderACFChart = () => {
-  if (!acfChart.value) return
+  if (!acfChart.value) {
+    console.warn('ACF图表容器不存在')
+    return
+  }
   
   const container = acfChart.value
   const acfData = timeSeriesResults.value.analysis.acf.acf_values
   const confidenceInterval = timeSeriesResults.value.analysis.acf.confidence_interval
   
+  // 检查容器尺寸
+  if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+    console.warn('ACF容器尺寸为0，延迟渲染')
+    setTimeout(() => renderACFChart(), 200)
+    return
+  }
+  
   // 清除之前的图表
   d3.select(container).selectAll("*").remove()
   
-  const margin = { top: 40, right: 30, bottom: 40, left: 60 }
+  const margin = { top: 20, right: 20, bottom: 30, left: 50 }
   const width = container.offsetWidth - margin.left - margin.right
-  const height = 300 - margin.top - margin.bottom
+  const height = 180 - margin.top - margin.bottom
+  
+  if (width <= 0 || height <= 0) {
+    console.warn('ACF图表计算尺寸无效:', { width, height })
+    return
+  }
   
   const svg = d3.select(container)
     .append("svg")
@@ -971,15 +986,6 @@ const renderACFChart = () => {
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`)
-  
-  // 添加标题
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", -10)
-    .attr("text-anchor", "middle")
-    .style("font-size", "14px")
-    .style("font-weight", "600")
-    .text("自相关函数(ACF)")
   
   // 设置比例尺
   const xScale = d3.scaleBand()
@@ -1055,9 +1061,13 @@ const renderACFChart = () => {
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(d3.axisBottom(xScale))
+    .selectAll("text")
+    .style("font-size", "10px")
   
   svg.append("g")
     .call(d3.axisLeft(yScale))
+    .selectAll("text")
+    .style("font-size", "10px")
   
   // 添加轴标签
   svg.append("text")
@@ -1066,13 +1076,13 @@ const renderACFChart = () => {
     .attr("x", 0 - (height / 2))
     .attr("dy", "1em")
     .style("text-anchor", "middle")
-    .style("font-size", "12px")
+    .style("font-size", "10px")
     .text("ACF值")
   
   svg.append("text")
     .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 5})`)
     .style("text-anchor", "middle")
-    .style("font-size", "12px")
+    .style("font-size", "10px")
     .text("滞后阶数")
 }
 
@@ -1093,22 +1103,29 @@ const renderSTLCharts = () => {
 
 // 渲染STL单个分量图表的通用函数
 const renderSTLChart = (container, data, title, color) => {
-  console.log(`渲染STL图表: ${title}, 数据点数: ${data.length}`)
+  console.log(`渲染STL图表: ${title}, 数据点数: ${data?.length || 0}`)
   
   if (!container || !data || data.length === 0) {
-    console.warn(`无法渲染${title}图表:`, { hasContainer: !!container, dataLength: data.length })
+    console.warn(`无法渲染${title}图表:`, { hasContainer: !!container, dataLength: data?.length || 0 })
+    return
+  }
+  
+  // 检查容器尺寸
+  if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+    console.warn(`${title}容器尺寸为0，延迟渲染`)
+    setTimeout(() => renderSTLChart(container, data, title, color), 200)
     return
   }
   
   // 清除之前的图表
   d3.select(container).selectAll("*").remove()
   
-  const margin = { top: 40, right: 30, bottom: 40, left: 60 }
+  const margin = { top: 15, right: 20, bottom: 25, left: 50 }
   const width = container.offsetWidth - margin.left - margin.right
-  const height = 250 - margin.top - margin.bottom
+  const height = 140 - margin.top - margin.bottom
   
   if (width <= 0 || height <= 0) {
-    console.warn('图表容器尺寸无效:', { width, height })
+    console.warn(`${title}图表计算尺寸无效:`, { width, height, containerWidth: container.offsetWidth, containerHeight: container.offsetHeight })
     return
   }
   
@@ -1118,15 +1135,6 @@ const renderSTLChart = (container, data, title, color) => {
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`)
-  
-  // 添加标题
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", -10)
-    .attr("text-anchor", "middle")
-    .style("font-size", "14px")
-    .style("font-weight", "600")
-    .text(title)
   
   // 处理时间数据，尝试多种日期格式
   const parseDate = d3.timeParse("%Y-%m-%d")
@@ -1223,13 +1231,32 @@ const renderSTLChart = (container, data, title, color) => {
       })
   }
   
-  // 添加坐标轴
+  // 添加坐标轴 - 智能控制X轴刻度数量
+  const dataLength = processedData.length
+  let tickCount = 5 // 默认显示5个刻度
+  
+  if (dataLength <= 10) {
+    tickCount = dataLength
+  } else if (dataLength <= 30) {
+    tickCount = 6
+  } else if (dataLength <= 60) {
+    tickCount = 8
+  } else {
+    tickCount = 10
+  }
+  
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%m-%d")))
+    .call(d3.axisBottom(xScale)
+      .ticks(tickCount)
+      .tickFormat(d3.timeFormat("%m-%d")))
+    .selectAll("text")
+    .style("font-size", "10px")
   
   svg.append("g")
     .call(d3.axisLeft(yScale))
+    .selectAll("text")
+    .style("font-size", "10px")
   
   // 添加轴标签
   svg.append("text")
@@ -1238,7 +1265,7 @@ const renderSTLChart = (container, data, title, color) => {
     .attr("x", 0 - (height / 2))
     .attr("dy", "1em")
     .style("text-anchor", "middle")
-    .style("font-size", "12px")
+    .style("font-size", "10px")
     .text("值")
 }
 
@@ -1377,408 +1404,501 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 容器和整体布局 */
 .dashboard-container {
-  padding: 20px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  min-height: 100vh;
+  padding: 8px;
+  overflow: hidden;
 }
 
-.dashboard-header {
-  margin-bottom: 30px;
+/* Grid 布局 - 3列2行 */
+.dashboard-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.2fr;
+  grid-template-rows: 1fr 1.33fr;
+  gap: 8px;
+  min-height: 0;
 }
 
-.title-section {
-  text-align: center;
-  margin-bottom: 20px;
+.grid-item {
+  min-height: 0;
+  min-width: 0;
 }
 
-.title-section h1 {
-  font-size: 32px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 10px 0;
-  background: linear-gradient(45deg, #3498db, #2980b9);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* 控制台 - 左上 */
+.console-panel {
+  grid-column: 1;
+  grid-row: 1;
 }
 
-.title-section p {
-  color: #7f8c8d;
-  font-size: 16px;
-  margin: 0;
+/* 时序分析 - 中上 */
+.timeseries-panel {
+  grid-column: 2;
+  grid-row: 1;
 }
 
-.filter-card {
-  border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+/* AI面板 - 右侧，跨两行 */
+.ai-panel {
+  grid-column: 3;
+  grid-row: 1 / 3;
 }
 
-.stats-section {
-  margin-bottom: 30px;
+/* 趋势图+企业排名 - 左下+中下，跨两列 */
+.combined-panel {
+  grid-column: 1 / 3;
+  grid-row: 2;
 }
 
-.stat-card {
-  border: none;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.stat-item {
+/* 卡片样式 */
+.full-height-card {
+  height: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.full-height-card :deep(.el-card__header) {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.full-height-card :deep(.el-card__body) {
+  flex: 1;
   padding: 10px;
-}
-
-.stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
+  flex-direction: column;
 }
 
-.total-icon {
-  background: linear-gradient(45deg, #3498db, #2980b9);
-  color: white;
-}
-
-.company-icon {
-  background: linear-gradient(45deg, #e74c3c, #c0392b);
-  color: white;
-}
-
-.industry-icon {
-  background: linear-gradient(45deg, #2ecc71, #27ae60);
-  color: white;
-}
-
-.repeat-icon {
-  background: linear-gradient(45deg, #f39c12, #d68910);
-  color: white;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #2c3e50;
-  line-height: 1;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  color: #7f8c8d;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.main-content, .analysis-section {
-  margin-bottom: 30px;
-}
-
-.chart-card, .ranking-card, .analysis-card {
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.card-header {
+.card-header-compact {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
+  font-size: 14px;
   color: #2c3e50;
 }
 
-.period-selector .el-radio-button {
-  border-radius: 6px;
-}
-
-.ranking-list {
-  max-height: 400px;
+/* 可滚动内容区域 */
+.scrollable-content {
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 5px;
 }
 
-.ranking-item {
+.scrollable-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 3px;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
+}
+
+/* 控制台样式 */
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+/* 企业排名样式 */
+.ranking-item-compact {
   display: flex;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
-  transition: all 0.3s ease;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  transition: all 0.2s ease;
 }
 
-.ranking-item:hover {
+.ranking-item-compact:hover {
   background-color: #f8f9fa;
-  border-radius: 8px;
-  margin: 0 -8px;
-  padding: 12px 8px;
+  border-radius: 6px;
+  margin: 0 -6px;
+  padding: 8px 6px;
 }
 
-.ranking-item:last-child {
+.ranking-item-compact:last-child {
   border-bottom: none;
 }
 
-.rank-number {
-  width: 30px;
-  height: 30px;
+.rank-number-compact {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 12px;
+  font-size: 12px;
+  margin-right: 10px;
   background-color: #ecf0f1;
   color: #7f8c8d;
+  flex-shrink: 0;
 }
 
-.rank-first .rank-number {
+.rank-first .rank-number-compact {
   background: linear-gradient(45deg, #f1c40f, #f39c12);
   color: white;
 }
 
-.rank-second .rank-number {
+.rank-second .rank-number-compact {
   background: linear-gradient(45deg, #95a5a6, #7f8c8d);
   color: white;
 }
 
-.rank-third .rank-number {
+.rank-third .rank-number-compact {
   background: linear-gradient(45deg, #e67e22, #d35400);
   color: white;
 }
 
-.company-info {
+.company-info-compact {
   flex: 1;
   min-width: 0;
 }
 
-.company-name {
+.company-name-compact {
   font-weight: 500;
+  font-size: 13px;
   color: #2c3e50;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.complaint-count {
+.complaint-count-compact {
   color: #7f8c8d;
-  font-size: 13px;
+  font-size: 11px;
 }
 
-.analysis-result {
-  margin-bottom: 30px;
+/* 组合面板样式（统计指标+趋势图+排名） */
+.combined-content {
+  display: flex;
+  gap: 12px;
+  height: 100%;
 }
 
-.analysis-result h4 {
-  color: #2c3e50;
-  margin: 0 0 15px 0;
+/* 左侧统计指标侧边栏 */
+.stats-sidebar {
+  width: 70px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-right: 1px solid #e4e7ed;
+  padding-right: 8px;
+}
+
+.stat-item-vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border-radius: 5px;
+  background: #f8f9fa;
+  text-align: center;
+  flex: 1;
+}
+
+.stat-item-vertical .el-icon {
+  margin-bottom: 4px;
+}
+
+.total-stat {
+  border-left: 3px solid #3498db;
+}
+
+.company-stat {
+  border-left: 3px solid #e74c3c;
+}
+
+.industry-stat {
+  border-left: 3px solid #2ecc71;
+}
+
+.repeat-stat {
+  border-left: 3px solid #f39c12;
+}
+
+.stat-content-vertical {
+  width: 100%;
+}
+
+.stat-value-vertical {
   font-size: 16px;
-}
-
-.stl-chart-container {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-}
-
-.stl-chart-container h5 {
-  color: #606266;
-  margin-bottom: 10px;
-  font-size: 14px;
   font-weight: bold;
+  color: #2c3e50;
+  line-height: 1.1;
+  margin-bottom: 2px;
 }
 
-.analysis-info {
+.stat-label-vertical {
   color: #7f8c8d;
-  margin: 0 0 15px 0;
-  font-size: 14px;
+  font-size: 9px;
+  line-height: 1.1;
+  word-wrap: break-word;
 }
 
-/* AI功能模块样式 */
-.ai-modules-section {
-  margin-top: 30px;
+/* 中间趋势图区域 */
+.trend-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.ai-module-card {
-  margin-bottom: 25px;
+/* 右侧企业排名 */
+.ranking-section {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e4e7ed;
+  padding-left: 12px;
+  overflow: hidden;
 }
 
-.ai-module-header {
+.ranking-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.ai-module-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-.ai-placeholder {
-  text-align: center;
-  padding: 40px 20px;
-  color: #909399;
-}
-
-.ai-placeholder p {
-  margin: 10px 0;
-}
-
-/* AI报告样式 */
-.ai-report-content {
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.report-meta {
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-}
-
-.report-text {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  line-height: 1.6;
-  font-size: 14px;
-  border: 1px solid #e9ecef;
-}
-
-.report-text p {
-  margin: 0 0 12px 0;
-}
-
-.report-text .highlight {
-  color: #e74c3c;
-  font-weight: bold;
-  background: #fff3cd;
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.report-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-/* AI辅助回复样式 */
-.ai-assistant-content {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-}
-
-.input-section h4,
-.output-section h4 {
-  color: #606266;
-  margin-bottom: 12px;
-  font-size: 15px;
   font-weight: 600;
-}
-
-.assistant-actions {
-  margin-top: 15px;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.output-section {
-  border-top: 1px solid #e4e7ed;
-  padding-top: 20px;
-}
-
-.reply-content {
-  margin-bottom: 15px;
-}
-
-.reply-textarea {
-  border-radius: 6px;
-}
-
-.reply-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.analysis-info {
-  margin-bottom: 20px;
-}
-
-.empty-ranking {
-  padding: 40px 0;
-  text-align: center;
-}
-
-/* 新增的示例内容样式 */
-.complaint-example, .reply-example {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e9ecef;
-  line-height: 1.6;
-  color: #495057;
-  font-size: 14px;
-}
-
-.complaint-textarea {
-  margin-bottom: 10px;
-}
-
-.complaint-example {
-  border-left: 4px solid #409eff;
-}
-
-.reply-example {
-  border-left: 4px solid #67c23a;
-}
-
-/* AI思考过程样式 */
-.thinking-section {
-  margin-bottom: 20px;
-  padding: 15px;
-  background: #f0f9ff;
-  border-left: 4px solid #409eff;
-  border-radius: 6px;
-}
-
-.thinking-content {
-  color: #606266;
   font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  background: #fff;
-  padding: 12px;
-  border-radius: 4px;
-  border: 1px solid #e4e7ed;
-  max-height: 200px;
-  overflow-y: auto;
+  color: #2c3e50;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
-.thinking-content::-webkit-scrollbar {
+.ranking-list-compact {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 5px;
+}
+
+.ranking-list-compact::-webkit-scrollbar {
   width: 6px;
 }
 
-.thinking-content::-webkit-scrollbar-thumb {
+.ranking-list-compact::-webkit-scrollbar-thumb {
   background: #dcdfe6;
   border-radius: 3px;
 }
 
-.thinking-content::-webkit-scrollbar-thumb:hover {
+.ranking-list-compact::-webkit-scrollbar-thumb:hover {
   background: #c0c4cc;
+}
+
+.trend-chart-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 时序分析样式 */
+.analysis-result-compact {
+  margin-bottom: 15px;
+}
+
+.analysis-result-compact h5 {
+  color: #2c3e50;
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stl-compact {
+  margin-bottom: 10px;
+}
+
+.stl-label {
+  color: #606266;
+  font-size: 12px;
+  margin: 5px 0;
+  font-weight: 500;
+}
+
+/* AI面板样式 */
+.ai-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-tabs :deep(.el-tabs__header) {
+  margin: 0 0 10px 0;
+}
+
+.ai-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.ai-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.ai-tab-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-action-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-output-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 5px;
+  min-height: 0;
+}
+
+.ai-output-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-output-area::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 3px;
+}
+
+.complaint-input-compact {
+  font-size: 13px;
+}
+
+.complaint-input-compact :deep(textarea) {
+  font-size: 13px;
+}
+
+/* AI结果内容 */
+.ai-result-content {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.thinking-section-compact {
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #f0f9ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.thinking-label {
+  font-weight: 600;
+  color: #909399;
+}
+
+.thinking-content-compact {
+  color: #606266;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  background: #fff;
+  padding: 8px;
+  border-radius: 3px;
+  border: 1px solid #e4e7ed;
+  max-height: 100px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+.thinking-content-compact::-webkit-scrollbar {
+  width: 4px;
+}
+
+.thinking-content-compact::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 2px;
+}
+
+.report-text-compact {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.reply-text-compact {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  border-left: 3px solid #67c23a;
+  line-height: 1.6;
+  color: #495057;
+  font-size: 13px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 15px;
+  color: #909399;
+  text-align: center;
+  height: 100%;
+}
+
+.empty-state p {
+  margin: 10px 0 0 0;
+  font-size: 13px;
+}
+
+/* 响应式调整 */
+@media (max-width: 1600px) {
+  .dashboard-grid {
+    grid-template-columns: 0.9fr 2fr 1.1fr;
+  }
+  
+  .ranking-section {
+    width: 240px;
+  }
+  
+  .stat-value-compact {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .dashboard-grid {
+    grid-template-columns: 0.8fr 2fr 1fr;
+  }
+  
+  .ranking-section {
+    width: 220px;
+  }
+  
+  .stat-value-compact {
+    font-size: 14px;
+  }
+  
+  .stat-label-compact {
+    font-size: 9px;
+  }
 }
 </style>

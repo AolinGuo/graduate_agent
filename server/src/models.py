@@ -809,10 +809,10 @@ class Model:
                     logger.error(f"计算月内重复投诉企业数失败: {e}")
                     repeat_companies_count = 0
 
-            # 企业投诉量排名（前10名）
+            # 企业投诉量排名（显示全部）
             company_ranking = []
             if "企业名称" in filtered_data.columns:
-                company_stats = filtered_data["企业名称"].value_counts().head(10)
+                company_stats = filtered_data["企业名称"].value_counts()  # 移除head(10)限制，显示全部
                 for company, count in company_stats.items():
                     company_ranking.append({"name": company, "count": int(count)})
 

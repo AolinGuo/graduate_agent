@@ -233,10 +233,10 @@ def ai_generate_report():
             # 返回基础统计数据
             return jsonify({"success": True, "report_data": stats})
 
-        # 使用AI生成报告
-        from src.ai_service import get_ai_service
+        # 使用vLLM AI生成报告
+        from src.ai_service_vllm import get_vllm_ai_service
 
-        ai_service = get_ai_service()
+        ai_service = get_vllm_ai_service()
 
         # 准备报告数据
         report_data = {
@@ -253,8 +253,8 @@ def ai_generate_report():
             ),  # 修正字段名
         }
 
-        # 生成AI报告
-        result = ai_service.generate_report(report_data)
+        # 生成AI报告（非流式）
+        result = ai_service.generate_report(report_data, stream=False)
 
         # result 可能是字典（包含thinking）或字符串（向后兼容）
         if isinstance(result, dict):
@@ -292,11 +292,11 @@ def ai_generate_reply():
         if not complaint_content:
             return jsonify({"success": False, "error": "投诉内容不能为空"}), 400
 
-        # 使用AI生成回复建议
-        from src.ai_service import get_ai_service
+        # 使用vLLM AI生成回复建议
+        from src.ai_service_vllm import get_vllm_ai_service
 
-        ai_service = get_ai_service()
-        result = ai_service.generate_reply_suggestion(complaint_content)
+        ai_service = get_vllm_ai_service()
+        result = ai_service.generate_reply_suggestion(complaint_content, stream=False)
 
         # result 可能是字典（包含thinking）或字符串（向后兼容）
         if isinstance(result, dict):
@@ -315,6 +315,142 @@ def ai_generate_reply():
                 "generated_at": datetime.now().isoformat(),
             }
 
+
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"AI回复生成失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============ vLLM加速的AI功能接口 (支持流式输出) ============
+
+
+@app.route("/ai/report/vllm", methods=["POST"])
+def ai_generate_report_vllm():
+    """使用vLLM生成分析报告（支持流式输出）"""
+    try:
+        data = request.get_json()
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+        stream = data.get("stream", False)  # 是否启用流式输出
+
+        # 获取统计数据
+        stats = model.get_dashboard_stats(start_date=start_date, end_date=end_date)
+
+        # 使用vLLM AI服务
+        from src.ai_service_vllm import get_vllm_ai_service
+
+        ai_service = get_vllm_ai_service()
+
+        # 准备报告数据
+        report_data = {
+            "time_range": f"{start_date or '开始'} 至 {end_date or '结束'}",
+            "total_complaints": stats.get("total_complaints", 0),
+            "total_companies": stats.get("companies_count", 0),
+            "total_industries": stats.get("industries_count", 0),
+            "repeat_companies": stats.get("repeat_companies_count", 0),
+            "trend_summary": _format_trend_summary(stats),
+            "top_companies": _format_top_items(stats.get("company_ranking", [])),
+        }
+
+        if stream:
+            # 流式输出
+            from flask import Response
+            import json
+
+            def generate():
+                """生成器函数，用于流式输出"""
+                try:
+                    for chunk in ai_service.generate_report(report_data, stream=True):
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    logger.error(f"流式生成出错: {e}")
+                    yield f"data: {json.dumps({'type': 'error', 'content': str(e), 'done': True}, ensure_ascii=False)}\n\n"
+
+            return Response(generate(), mimetype="text/event-stream")
+        else:
+            # 非流式输出
+            result = ai_service.generate_report(report_data, stream=False)
+
+            if isinstance(result, dict):
+                response_data = {
+                    "success": True,
+                    "report": result.get("reply", ""),
+                    "thinking": result.get("thinking"),
+                    "report_data": report_data,
+                    "generated_at": datetime.now().isoformat(),
+                }
+            else:
+                response_data = {
+                    "success": True,
+                    "report": result,
+                    "thinking": None,
+                    "report_data": report_data,
+                    "generated_at": datetime.now().isoformat(),
+                }
+
+            return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"vLLM AI报告生成失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/ai/reply/vllm", methods=["POST"])
+def ai_generate_reply_vllm():
+    """使用vLLM生成回复建议（支持流式输出）"""
+    try:
+        data = request.get_json()
+        complaint_content = data.get("complaint_content", "")
+        stream = data.get("stream", False)
+
+        if not complaint_content:
+            return jsonify({"success": False, "error": "投诉内容不能为空"}), 400
+
+        # 使用vLLM AI服务
+        from src.ai_service_vllm import get_vllm_ai_service
+
+        ai_service = get_vllm_ai_service()
+
+        if stream:
+            # 流式输出
+            from flask import Response
+            import json
+
+            def generate():
+                """生成器函数，用于流式输出"""
+                try:
+                    for chunk in ai_service.generate_reply_suggestion(
+                        complaint_content, stream=True
+                    ):
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    logger.error(f"流式生成出错: {e}")
+                    yield f"data: {json.dumps({'type': 'error', 'content': str(e), 'done': True}, ensure_ascii=False)}\n\n"
+
+            return Response(generate(), mimetype="text/event-stream")
+        else:
+            # 非流式输出
+            result = ai_service.generate_reply_suggestion(
+                complaint_content, stream=False
+            )
+
+            if isinstance(result, dict):
+                response_data = {
+                    "success": True,
+                    "reply": result.get("reply", ""),
+                    "thinking": result.get("thinking"),
+                    "generated_at": datetime.now().isoformat(),
+                }
+            else:
+                response_data = {
+                    "success": True,
+                    "reply": result,
+                    "thinking": None,
+                    "generated_at": datetime.now().isoformat(),
+                }
+
         return jsonify(response_data)
 
     except Exception as e:
@@ -324,11 +460,11 @@ def ai_generate_reply():
 
 @app.route("/ai/status")
 def ai_status():
-    """检查AI服务状态"""
+    """检查vLLM AI服务状态"""
     try:
-        from src.ai_service import get_ai_service
+        from src.ai_service_vllm import get_vllm_ai_service
 
-        ai_service = get_ai_service()
+        ai_service = get_vllm_ai_service()
 
         return jsonify(
             {
