@@ -605,6 +605,91 @@ def get_trend_data():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/dashboard/sunburst", methods=["GET", "POST"])
+def get_sunburst_data():
+    """获取旭日图数据"""
+    try:
+        if request.method == "POST":
+            data = request.get_json()
+            start_date = data.get("start_date")
+            end_date = data.get("end_date")
+            chart_type = data.get("chart_type", "category")  # "category" 或 "issue"
+            companies = data.get("companies", [])
+            industries = data.get("industries", [])
+            categories = data.get("categories", [])
+            industry_level1 = data.get("industry_level1", [])
+            industry_level2 = data.get("industry_level2", [])
+        else:
+            # GET请求使用默认参数
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            chart_type = request.args.get("chart_type", "category")
+
+        logger.info(f"获取旭日图数据: type={chart_type}, date_range={start_date} to {end_date}")
+
+        result = model.get_sunburst_data(
+            start_date=start_date,
+            end_date=end_date,
+            companies=companies if companies else None,
+            industries=industries if industries else None,
+            categories=categories if categories else None,
+            industry_level1=industry_level1 if industry_level1 else None,
+            industry_level2=industry_level2 if industry_level2 else None,
+            chart_type=chart_type,
+        )
+
+        if isinstance(result, dict) and "error" in result:
+            return jsonify({"error": result["error"]}), 400
+
+        logger.info(f"返回旭日图数据: {len(result.get('children', []))} 个顶级节点")
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"获取旭日图数据失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/dashboard/sankey", methods=["GET", "POST"])
+def get_sankey_data():
+    """获取桑基图数据"""
+    try:
+        if request.method == "POST":
+            data = request.get_json()
+            start_date = data.get("start_date")
+            end_date = data.get("end_date")
+            companies = data.get("companies", [])
+            industries = data.get("industries", [])
+            categories = data.get("categories", [])
+            industry_level1 = data.get("industry_level1", [])
+            industry_level2 = data.get("industry_level2", [])
+        else:
+            # GET请求使用默认参数
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+
+        logger.info(f"获取桑基图数据: date_range={start_date} to {end_date}")
+
+        result = model.get_sankey_data(
+            start_date=start_date,
+            end_date=end_date,
+            companies=companies if companies else None,
+            industries=industries if industries else None,
+            categories=categories if categories else None,
+            industry_level1=industry_level1 if industry_level1 else None,
+            industry_level2=industry_level2 if industry_level2 else None,
+        )
+
+        if isinstance(result, dict) and "error" in result:
+            return jsonify({"error": result["error"]}), 400
+
+        logger.info(f"返回桑基图数据: {len(result.get('nodes', []))} 个节点, {len(result.get('links', []))} 个链接")
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"获取桑基图数据失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============ 兼容原va-framework接口 ============
 
 
@@ -682,6 +767,157 @@ def get_complaint_analysis():
     except Exception as e:
         logger.error(f"投诉分析失败: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ============ RAG知识库接口 ============
+
+
+@app.route("/rag/status")
+def rag_status():
+    """获取RAG知识库状态"""
+    try:
+        from src.rag_service import get_rag_service
+        
+        rag_service = get_rag_service()
+        stats = rag_service.get_statistics()
+        
+        return jsonify({
+            "success": True,
+            "status": "ready" if stats["is_initialized"] else "not_initialized",
+            "statistics": stats
+        })
+        
+    except Exception as e:
+        logger.error(f"获取RAG状态失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/rag/build", methods=["POST"])
+def rag_build():
+    """构建RAG知识库"""
+    try:
+        data = request.get_json() or {}
+        force_rebuild = data.get("force_rebuild", False)
+        
+        from src.rag_service import get_rag_service
+        
+        rag_service = get_rag_service()
+        
+        # 构建知识库（可能需要较长时间）
+        logger.info(f"开始构建RAG知识库，force_rebuild={force_rebuild}")
+        rag_service.build_knowledge_base(force_rebuild=force_rebuild)
+        
+        stats = rag_service.get_statistics()
+        
+        return jsonify({
+            "success": True,
+            "message": "知识库构建完成",
+            "statistics": stats
+        })
+        
+    except Exception as e:
+        logger.error(f"构建RAG知识库失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/rag/search", methods=["POST"])
+def rag_search():
+    """检索法律知识库"""
+    try:
+        data = request.get_json()
+        query = data.get("query", "")
+        top_k = data.get("top_k", 5)
+        
+        if not query:
+            return jsonify({"success": False, "error": "查询内容不能为空"}), 400
+        
+        from src.rag_service import get_rag_service
+        
+        rag_service = get_rag_service()
+        
+        # 检索相关文档
+        results = rag_service.search(query=query, top_k=top_k)
+        
+        return jsonify({
+            "success": True,
+            "query": query,
+            "results": results,
+            "count": len(results)
+        })
+        
+    except Exception as e:
+        logger.error(f"RAG检索失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/rag/query", methods=["POST"])
+def rag_query():
+    """RAG问答接口（检索+生成）"""
+    try:
+        data = request.get_json()
+        question = data.get("question", "")
+        top_k = data.get("top_k", 3)
+        use_ai = data.get("use_ai", True)
+        
+        if not question:
+            return jsonify({"success": False, "error": "问题不能为空"}), 400
+        
+        from src.rag_service import get_rag_service
+        
+        rag_service = get_rag_service()
+        
+        # 检索相关文档
+        results = rag_service.search(query=question, top_k=top_k)
+        
+        if not use_ai:
+            # 只返回检索结果
+            return jsonify({
+                "success": True,
+                "question": question,
+                "retrieved_documents": results,
+                "answer": None
+            })
+        
+        # 使用AI生成回答
+        from src.ai_service_unified import get_unified_ai_service
+        
+        ai_service = get_unified_ai_service()
+        
+        # 构建上下文
+        context = "\n\n".join([
+            f"【{doc['metadata']['title']}】\n{doc['content'][:500]}"
+            for doc in results
+        ])
+        
+        # 构建提示词
+        prompt = f"""根据以下法律法规内容回答问题。
+
+相关法律法规：
+{context}
+
+问题：{question}
+
+请基于上述法律法规内容，给出专业、准确的回答。如果相关内容中没有直接答案，请说明情况。"""
+        
+        # 生成回答
+        response = ai_service.generate_response(
+            user_input=prompt,
+            system_prompt="你是一个专业的法律顾问助手，擅长解读法律法规并提供准确的法律咨询。",
+            temperature=0.3,
+            max_tokens=1024
+        )
+        
+        return jsonify({
+            "success": True,
+            "question": question,
+            "retrieved_documents": results,
+            "answer": response,
+            "generated_at": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"RAG问答失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============ 错误处理 ============

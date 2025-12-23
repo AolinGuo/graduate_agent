@@ -987,3 +987,261 @@ class Model:
         except Exception as e:
             logger.error(f"报告生成失败: {e}")
             return {"error": str(e)}
+
+    def get_sunburst_data(
+        self,
+        start_date=None,
+        end_date=None,
+        companies=None,
+        industries=None,
+        categories=None,
+        industry_level1=None,
+        industry_level2=None,
+        chart_type="category"  # "category" 或 "issue"
+    ):
+        """获取旭日图数据
+
+        Args:
+            chart_type: "category" 表示问题分类旭日图，"issue" 表示涉及问题旭日图
+        """
+        try:
+            filtered_data = self._get_filtered_data_enhanced(
+                start_date,
+                end_date,
+                companies,
+                industries,
+                categories,
+                industry_level1,
+                industry_level2,
+            )
+
+            if filtered_data.empty:
+                logger.warning("筛选后数据为空")
+                return {"name": "root", "children": []}
+
+            if chart_type == "category":
+                # 问题分类旭日图：问题分类1 -> 问题分类2 -> 问题分类3
+                required_columns = ["问题分类1", "问题分类2", "问题分类3"]
+                for col in required_columns:
+                    if col not in filtered_data.columns:
+                        logger.error(f"缺少必要的列: {col}")
+                        return {"error": f"数据中缺少列: {col}"}
+
+                # 统计各级分类的数量
+                level1_counts = filtered_data["问题分类1"].value_counts()
+                result = {"name": "问题分类", "children": []}
+
+                for level1_name, level1_count in level1_counts.items():
+                    if pd.isna(level1_name) or level1_name == "":
+                        continue
+
+                    level1_node = {"name": level1_name, "children": []}
+                    level1_data = filtered_data[filtered_data["问题分类1"] == level1_name]
+
+                    level2_counts = level1_data["问题分类2"].value_counts()
+                    for level2_name, level2_count in level2_counts.items():
+                        if pd.isna(level2_name) or level2_name == "":
+                            continue
+
+                        level2_node = {"name": level2_name, "children": []}
+                        level2_data = level1_data[level1_data["问题分类2"] == level2_name]
+
+                        level3_counts = level2_data["问题分类3"].value_counts()
+                        for level3_name, level3_count in level3_counts.items():
+                            if pd.isna(level3_name) or level3_name == "":
+                                continue
+
+                            level3_node = {
+                                "name": level3_name,
+                                "value": int(level3_count)
+                            }
+                            level2_node["children"].append(level3_node)
+
+                        if level2_node["children"]:  # 只添加有子节点的节点
+                            level1_node["children"].append(level2_node)
+
+                    if level1_node["children"]:  # 只添加有子节点的节点
+                        result["children"].append(level1_node)
+
+            elif chart_type == "issue":
+                # 涉及问题旭日图：涉及问题(1) -> 涉及问题(2)
+                required_columns = ["涉及问题(1)", "涉及问题(2)"]
+                for col in required_columns:
+                    if col not in filtered_data.columns:
+                        logger.error(f"缺少必要的列: {col}")
+                        return {"error": f"数据中缺少列: {col}"}
+
+                # 统计各级问题的数量
+                issue1_counts = filtered_data["涉及问题(1)"].value_counts()
+                result = {"name": "涉及问题", "children": []}
+
+                for issue1_name, issue1_count in issue1_counts.items():
+                    if pd.isna(issue1_name) or issue1_name == "":
+                        continue
+
+                    issue1_node = {"name": issue1_name, "children": []}
+                    issue1_data = filtered_data[filtered_data["涉及问题(1)"] == issue1_name]
+
+                    issue2_counts = issue1_data["涉及问题(2)"].value_counts()
+                    for issue2_name, issue2_count in issue2_counts.items():
+                        if pd.isna(issue2_name) or issue2_name == "":
+                            continue
+
+                        issue2_node = {
+                            "name": issue2_name,
+                            "value": int(issue2_count)
+                        }
+                        issue1_node["children"].append(issue2_node)
+
+                    if issue1_node["children"]:  # 只添加有子节点的节点
+                        result["children"].append(issue1_node)
+            else:
+                return {"error": f"不支持的图表类型: {chart_type}"}
+
+            logger.info(f"生成{chart_type}旭日图数据完成")
+            return result
+
+        except Exception as e:
+            logger.error(f"获取旭日图数据失败: {e}")
+            return {"error": str(e)}
+
+    def get_sankey_data(
+        self,
+        start_date=None,
+        end_date=None,
+        companies=None,
+        industries=None,
+        categories=None,
+        industry_level1=None,
+        industry_level2=None,
+    ):
+        """获取桑基图数据
+
+        诉求流转：案卷来源 -> 行业名称(1) -> 行业名称(2) -> 处理单位
+        """
+        try:
+            logger.info(f"获取桑基图数据，筛选条件: start_date={start_date}, end_date={end_date}, companies={companies}, industries={industries}, categories={categories}")
+            filtered_data = self._get_filtered_data_enhanced(
+                start_date,
+                end_date,
+                companies,
+                industries,
+                categories,
+                industry_level1,
+                industry_level2,
+            )
+
+            logger.info(f"桑基图筛选后数据量: {len(filtered_data)}")
+            if filtered_data.empty:
+                logger.warning("筛选后数据为空")
+                return {"nodes": [], "links": []}
+
+            # 检查必要的字段
+            required_columns = ["案卷来源", "问题分类1", "处理单位"]
+            logger.info(f"数据列: {list(filtered_data.columns)}")
+            for col in required_columns:
+                if col not in filtered_data.columns:
+                    logger.error(f"缺少必要的列: {col}")
+                    return {"error": f"数据中缺少列: {col}"}
+
+            logger.info(f"案卷来源非空数量: {filtered_data['案卷来源'].notna().sum()}")
+            logger.info(f"行业名称(1)非空数量: {filtered_data['行业名称(1)'].notna().sum()}")
+            logger.info(f"行业名称(2)非空数量: {filtered_data['行业名称(2)'].notna().sum()}")
+            logger.info(f"处理单位非空数量: {filtered_data['处理单位'].notna().sum()}")
+
+            # 统计四层关系：来源 -> 行业名称(1) -> 行业名称(2) -> 处理单位
+            sankey_data = filtered_data.groupby(["案卷来源", "行业名称(1)", "行业名称(2)", "处理单位"]).size().reset_index(name="value")
+
+            # 处理空值，将行业名称(2)空值替换为"空白"
+            sankey_data["行业名称(2)"] = sankey_data["行业名称(2)"].fillna("空白")
+            sankey_data["行业名称(2)"] = sankey_data["行业名称(2)"].replace("", "空白")
+
+            # 过滤掉其他空值
+            sankey_data = sankey_data[
+                (sankey_data["案卷来源"].notna()) &
+                (sankey_data["行业名称(1)"].notna()) &
+                (sankey_data["处理单位"].notna()) &
+                (sankey_data["案卷来源"] != "") &
+                (sankey_data["行业名称(1)"] != "") &
+                (sankey_data["处理单位"] != "")
+            ]
+
+            if sankey_data.empty:
+                return {"nodes": [], "links": []}
+
+            # 创建节点列表（去重）
+            nodes = []
+
+            # 来源节点
+            sources = sankey_data["案卷来源"].unique()
+            for source in sources:
+                nodes.append({"name": source, "category": "source"})
+
+            # 行业一级节点
+            industries_level1 = sankey_data["行业名称(1)"].unique()
+            for industry in industries_level1:
+                nodes.append({"name": industry, "category": "industry_l1"})
+
+            # 行业二级节点
+            industries_level2 = sankey_data["行业名称(2)"].unique()
+            for industry in industries_level2:
+                nodes.append({"name": industry, "category": "industry_l2"})
+
+            # 处理单位节点
+            units = sankey_data["处理单位"].unique()
+            for unit in units:
+                nodes.append({"name": unit, "category": "unit"})
+
+            # 创建节点名称到索引的映射
+            node_map = {node["name"]: i for i, node in enumerate(nodes)}
+
+            # 创建链接列表
+            links = []
+            for _, row in sankey_data.iterrows():
+                # 来源 -> 行业名称(1)
+                source_to_industry_l1 = {
+                    "source": node_map[row["案卷来源"]],
+                    "target": node_map[row["行业名称(1)"]],
+                    "value": int(row["value"])
+                }
+                links.append(source_to_industry_l1)
+
+                # 行业名称(1) -> 行业名称(2)
+                industry_l1_to_l2 = {
+                    "source": node_map[row["行业名称(1)"]],
+                    "target": node_map[row["行业名称(2)"]],
+                    "value": int(row["value"])
+                }
+                links.append(industry_l1_to_l2)
+
+                # 行业名称(2) -> 处理单位
+                industry_l2_to_unit = {
+                    "source": node_map[row["行业名称(2)"]],
+                    "target": node_map[row["处理单位"]],
+                    "value": int(row["value"])
+                }
+                links.append(industry_l2_to_unit)
+
+            # 对links进行归约，合并相同source和target的链接
+            links_dict = {}
+            for link in links:
+                key = f"{link['source']}-{link['target']}"
+                if key in links_dict:
+                    links_dict[key]["value"] += link["value"]
+                else:
+                    links_dict[key] = link.copy()
+
+            # 将字典转换回列表
+            merged_links = list(links_dict.values())
+
+            result = {
+                "nodes": nodes,
+                "links": merged_links
+            }
+
+            logger.info(f"生成桑基图数据完成: {len(nodes)} 个节点, {len(links)} 个原始链接, {len(merged_links)} 个合并后链接")
+            return result
+
+        except Exception as e:
+            logger.error(f"获取桑基图数据失败: {e}")
+            return {"error": str(e)}

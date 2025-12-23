@@ -12,7 +12,7 @@ interface ApiParams {
 
 // 配置axios基础URL
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 300000,  // 延长到300秒，适应AI模型加载和推理时间
   headers: {
     'Content-Type': 'application/json'
@@ -100,6 +100,14 @@ export const getDashboardStats = (params: ApiParams) => {
 
 export const getTrendData = (params: ApiParams) => {
   return apiClient.post('/dashboard/trend', params)
+}
+
+export const getSunburstData = (params: ApiParams) => {
+  return apiClient.post('/dashboard/sunburst', params)
+}
+
+export const getSankeyData = (params: ApiParams) => {
+  return apiClient.post('/dashboard/sankey', params)
 }
 
 // ============ 兼容原va-framework接口 ============

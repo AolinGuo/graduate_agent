@@ -2,16 +2,30 @@
   <div class="dashboard-container">
     <!-- 主网格布局 -->
     <div class="dashboard-grid">
+      <!-- 最左：小型旭日图 -->
+      <div class="grid-item mini-sunburst-panel">
+        <TheSunburstCharts
+          :start-date="filters.startDate"
+          :end-date="filters.endDate"
+          :selected-companies="filters.selectedCompanies"
+          :selected-industries="filters.selectedIndustries"
+          :selected-categories="filters.selectedCategories"
+          :selected-industry-level1="filters.selectedIndustryLevel1"
+          :selected-industry-level2="filters.selectedIndustryLevel2"
+          ref="sunburstChartsRef"
+        />
+      </div>
+
       <!-- 左上：控制台 -->
       <div class="grid-item console-panel">
         <el-card class="full-height-card" shadow="hover">
           <template #header>
             <div class="card-header-compact">
               <span>控制台</span>
-              <el-button 
-                type="primary" 
-                size="small" 
-                @click="loadDashboardData" 
+              <el-button
+                type="primary"
+                size="small"
+                @click="loadDashboardData"
                 :loading="loading"
                 circle>
                 <el-icon><Refresh /></el-icon>
@@ -28,10 +42,9 @@
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
                   style="width: 100%"
-                  @change="loadDashboardData"
                 />
               </el-form-item>
-              
+
               <el-form-item label="结束日期">
                 <el-date-picker
                   v-model="filters.endDate"
@@ -40,10 +53,9 @@
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
                   style="width: 100%"
-                  @change="loadDashboardData"
                 />
               </el-form-item>
-              
+
               <el-form-item label="企业选择">
                 <el-select
                   v-model="filters.selectedCompanies"
@@ -53,7 +65,6 @@
                   placeholder="选择企业"
                   style="width: 100%"
                   :max-collapse-tags="1"
-                  @change="loadDashboardData"
                 >
                   <el-option
                     v-for="company in filterOptions.companies"
@@ -63,7 +74,7 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="行业大类">
                 <el-select
                   v-model="filters.selectedIndustryLevel1"
@@ -73,7 +84,6 @@
                   placeholder="选择行业大类"
                   style="width: 100%"
                   :max-collapse-tags="1"
-                  @change="loadDashboardData"
                 >
                   <el-option
                     v-for="industry in filterOptions.industryLevel1"
@@ -83,7 +93,7 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="行业中类">
                 <el-select
                   v-model="filters.selectedIndustryLevel2"
@@ -93,7 +103,6 @@
                   placeholder="选择行业中类"
                   style="width: 100%"
                   :max-collapse-tags="1"
-                  @change="loadDashboardData"
                 >
                   <el-option
                     v-for="industry in filterOptions.industryLevel2"
@@ -103,7 +112,7 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="详细分类">
                 <el-select
                   v-model="filters.selectedIndustries"
@@ -113,7 +122,6 @@
                   placeholder="选择详细分类"
                   style="width: 100%"
                   :max-collapse-tags="1"
-                  @change="loadDashboardData"
                 >
                   <el-option
                     v-for="industry in filterOptions.industries"
@@ -123,7 +131,7 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="问题分类">
                 <el-select
                   v-model="filters.selectedCategories"
@@ -133,7 +141,6 @@
                   placeholder="选择问题分类"
                   style="width: 100%"
                   :max-collapse-tags="1"
-                  @change="loadDashboardData"
                 >
                   <el-option
                     v-for="category in filterOptions.categories"
@@ -143,37 +150,37 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item>
                 <el-button @click="clearFilters" size="small" style="width: 100%">
                   <el-icon><RefreshLeft /></el-icon>
                   重置筛选
                 </el-button>
               </el-form-item>
-              
+
               <div class="filter-tags">
-                <el-tag 
-                  v-if="filters.selectedCompanies.length > 0" 
-                  type="info" 
-                  size="small" 
-                  closable 
-                  @close="filters.selectedCompanies = []; loadDashboardData()">
+                <el-tag
+                  v-if="filters.selectedCompanies.length > 0"
+                  type="info"
+                  size="small"
+                  closable
+                  @close="filters.selectedCompanies = []; updateSunburstCharts()">
                   企业: {{ filters.selectedCompanies.length }}
                 </el-tag>
-                <el-tag 
-                  v-if="filters.selectedIndustries.length > 0" 
-                  type="success" 
-                  size="small" 
-                  closable 
-                  @close="filters.selectedIndustries = []; loadDashboardData()">
+                <el-tag
+                  v-if="filters.selectedIndustries.length > 0"
+                  type="success"
+                  size="small"
+                  closable
+                  @close="filters.selectedIndustries = []; updateSunburstCharts()">
                   行业: {{ filters.selectedIndustries.length }}
                 </el-tag>
-                <el-tag 
-                  v-if="filters.selectedCategories.length > 0" 
-                  type="warning" 
-                  size="small" 
-                  closable 
-                  @close="filters.selectedCategories = []; loadDashboardData()">
+                <el-tag
+                  v-if="filters.selectedCategories.length > 0"
+                  type="warning"
+                  size="small"
+                  closable
+                  @close="filters.selectedCategories = []; updateSunburstCharts()">
                   问题: {{ filters.selectedCategories.length }}
                 </el-tag>
               </div>
@@ -232,7 +239,21 @@
         </el-card>
       </div>
 
-      <!-- 中下：趋势图 + 统计指标 + 企业排名 -->
+      <!-- 中间：桑基图 -->
+      <div class="grid-item sankey-panel">
+        <TheSankeyChart
+          :start-date="filters.startDate"
+          :end-date="filters.endDate"
+          :selected-companies="filters.selectedCompanies"
+          :selected-industries="filters.selectedIndustries"
+          :selected-categories="filters.selectedCategories"
+          :selected-industry-level1="filters.selectedIndustryLevel1"
+          :selected-industry-level2="filters.selectedIndustryLevel2"
+          ref="sankeyChartRef"
+        />
+      </div>
+
+      <!-- 下方：趋势图 + 统计指标 + 企业排名 -->
       <div class="grid-item combined-panel">
         <el-card class="full-height-card" shadow="hover">
           <template #header>
@@ -421,18 +442,19 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { 
+import {
   Refresh, Document, OfficeBuilding, Grid, Warning, TrendCharts, RefreshLeft,
-  ChatDotSquare, Loading, View
+  ChatDotSquare, Loading, View, PieChart, Share
 } from '@element-plus/icons-vue'
-import { 
-  getDashboardStats, 
-  getTrendData, 
+import {
+  getDashboardStats,
+  getTrendData,
   analyzeTimeSeries,
   getDataSummary,
   getFilterOptions,
   generateAIReport,
-  generateAIReply
+  generateAIReply,
+  getSankeyData
 } from '@/stores/complaint-store'
 import * as d3 from 'd3'
 
@@ -487,6 +509,8 @@ const trendChart = ref(null)
 const acfChart = ref(null)
 const stlTrendChart = ref(null)
 const stlSeasonalChart = ref(null)
+const sunburstChartsRef = ref(null)
+const sankeyChartRef = ref(null)
 
 // 初始化数据
 const initializeDashboard = async () => {
@@ -545,7 +569,13 @@ const initializeDashboard = async () => {
     // 加载仪表板数据
     await loadDashboardData()
     await loadTrendData()
-    
+
+    // 等待DOM更新后再触发桑基图更新
+    await nextTick()
+    if (sankeyChartRef.value) {
+      sankeyChartRef.value.updateSankeyChart()
+    }
+
     console.log('仪表板初始化完成')
   } catch (error) {
     console.error('初始化仪表板失败:', error)
@@ -586,6 +616,7 @@ const loadDashboardData = async () => {
       } else {
         dashboardStats.value = response.data
         console.log('仪表板数据更新成功:', dashboardStats.value)
+        // 筛选条件改变时，桑基图会通过props自动更新，无需手动调用
       }
     }
   } catch (error) {
@@ -1396,6 +1427,7 @@ const formatReportText = (text) => {
 }
 
 
+
 // 组件挂载
 onMounted(() => {
   console.log('组件挂载，开始初始化...')
@@ -1414,12 +1446,12 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* Grid 布局 - 3列2行 */
+/* Grid 布局 - 4列3行 */
 .dashboard-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 2fr 1.2fr;
-  grid-template-rows: 1fr 1.33fr;
+  grid-template-columns: 0.8fr 1fr 2fr 1.2fr;
+  grid-template-rows: 1fr 1.33fr 1.2fr;
   gap: 8px;
   min-height: 0;
 }
@@ -1429,28 +1461,40 @@ onMounted(() => {
   min-width: 0;
 }
 
+/* 小型旭日图 - 最左 */
+.mini-sunburst-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 /* 控制台 - 左上 */
 .console-panel {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 1;
 }
 
 /* 时序分析 - 中上 */
 .timeseries-panel {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
 }
 
-/* AI面板 - 右侧，跨两行 */
-.ai-panel {
-  grid-column: 3;
-  grid-row: 1 / 3;
+/* 桑基图 - 中间 */
+.sankey-panel {
+  grid-column: 2 / 4;
+  grid-row: 2;
 }
 
-/* 趋势图+企业排名 - 左下+中下，跨两列 */
+/* AI面板 - 右侧，跨三行 */
+.ai-panel {
+  grid-column: 4;
+  grid-row: 1 / 4;
+}
+
+/* 趋势图+企业排名 - 下方，跨两列 */
 .combined-panel {
-  grid-column: 1 / 3;
-  grid-row: 2;
+  grid-column: 2 / 4;
+  grid-row: 3;
 }
 
 /* 卡片样式 */
@@ -1869,16 +1913,17 @@ onMounted(() => {
   font-size: 13px;
 }
 
+
 /* 响应式调整 */
 @media (max-width: 1600px) {
   .dashboard-grid {
-    grid-template-columns: 0.9fr 2fr 1.1fr;
+    grid-template-columns: 0.7fr 1fr 2fr 1.1fr;
   }
-  
+
   .ranking-section {
     width: 240px;
   }
-  
+
   .stat-value-compact {
     font-size: 15px;
   }

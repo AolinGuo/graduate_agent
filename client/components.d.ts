@@ -16,6 +16,8 @@ declare module '@vue/runtime-core' {
     TheDateSelector: typeof import('./src/components/TheDateSelector.vue')['default']
     TheLocationLegend: typeof import('./src/components/TheLocationLegend.vue')['default']
     TheLocationSelector: typeof import('./src/components/TheLocationSelector.vue')['default']
+    TheSankeyChart: typeof import('./src/components/TheSankeyChart.vue')['default']
+    TheSunburstCharts: typeof import('./src/components/TheSunburstCharts.vue')['default']
     TheVesselMovementView: typeof import('./src/components/TheVesselMovementView.vue')['default']
     TheVesselSelector: typeof import('./src/components/TheVesselSelector.vue')['default']
     TheVesselTSNE: typeof import('./src/components/TheVesselTSNE.vue')['default']
