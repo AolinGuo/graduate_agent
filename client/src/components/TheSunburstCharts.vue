@@ -1,11 +1,6 @@
 <template>
-  <el-card class="sunburst-card" shadow="hover">
-    <template #header>
-      <div class="card-header-compact">
-        <span>数据分类概览</span>
-      </div>
-    </template>
-    <div class="sunburst-charts-container">
+  <div class="sunburst-container">
+    <div class="sunburst-charts-wrapper">
       <!-- 问题分类旭日图 -->
       <div class="sunburst-chart-item">
         <div ref="categorySunburstChart" class="sunburst-chart"></div>
@@ -18,7 +13,7 @@
         <div class="chart-label">涉及问题</div>
       </div>
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -322,31 +317,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 旭日图卡片样式 */
-.sunburst-card {
+/* 旭日图容器样式 - 紧凑扁平 */
+.sunburst-container {
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 5px;
+  background: transparent;
 }
 
-.sunburst-card :deep(.el-card__header) {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.sunburst-card :deep(.el-card__body) {
-  flex: 1;
-  padding: 10px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 旭日图样式 */
-.sunburst-charts-container {
+/* 旭日图样式 - 无边框 */
+.sunburst-charts-wrapper {
   flex: 1;
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: stretch;
 }
 
@@ -359,48 +343,40 @@ onMounted(() => {
 
 .sunburst-chart {
   flex: 1;
-  min-height: 140px;
+  min-height: 100px;
   width: 100%;
-  background: white;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  background: transparent;
 }
 
 .chart-label {
   text-align: center;
-  padding: 8px 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2c3e50;
-  background: #f8f9fa;
-  border-radius: 4px;
-  margin-top: 8px;
+  padding: 4px 2px 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #606266;
+  background: transparent;
 }
 
 /* 响应式调整 */
 @media (max-width: 1600px) {
-  .sunburst-charts-container {
-    gap: 12px;
+  .sunburst-charts-wrapper {
+    gap: 6px;
   }
 
   .chart-label {
-    font-size: 11px;
-    padding: 6px 2px;
+    font-size: 10px;
+    padding: 3px 2px 0 2px;
   }
 
   .sunburst-chart {
-    min-height: 120px;
+    min-height: 80px;
   }
 }
 
 @media (max-width: 1200px) {
-  .sunburst-charts-container {
+  .sunburst-charts-wrapper {
     flex-direction: column;
-    gap: 12px;
-  }
-
-  .chart-label {
-    margin-top: 6px;
+    gap: 6px;
   }
 }
 </style>

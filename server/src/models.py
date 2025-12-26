@@ -812,7 +812,9 @@ class Model:
             # 企业投诉量排名（显示全部）
             company_ranking = []
             if "企业名称" in filtered_data.columns:
-                company_stats = filtered_data["企业名称"].value_counts()  # 移除head(10)限制，显示全部
+                company_stats = filtered_data[
+                    "企业名称"
+                ].value_counts()  # 移除head(10)限制，显示全部
                 for company, count in company_stats.items():
                     company_ranking.append({"name": company, "count": int(count)})
 
@@ -997,7 +999,7 @@ class Model:
         categories=None,
         industry_level1=None,
         industry_level2=None,
-        chart_type="category"  # "category" 或 "issue"
+        chart_type="category",  # "category" 或 "issue"
     ):
         """获取旭日图数据
 
@@ -1036,7 +1038,9 @@ class Model:
                         continue
 
                     level1_node = {"name": level1_name, "children": []}
-                    level1_data = filtered_data[filtered_data["问题分类1"] == level1_name]
+                    level1_data = filtered_data[
+                        filtered_data["问题分类1"] == level1_name
+                    ]
 
                     level2_counts = level1_data["问题分类2"].value_counts()
                     for level2_name, level2_count in level2_counts.items():
@@ -1044,7 +1048,9 @@ class Model:
                             continue
 
                         level2_node = {"name": level2_name, "children": []}
-                        level2_data = level1_data[level1_data["问题分类2"] == level2_name]
+                        level2_data = level1_data[
+                            level1_data["问题分类2"] == level2_name
+                        ]
 
                         level3_counts = level2_data["问题分类3"].value_counts()
                         for level3_name, level3_count in level3_counts.items():
@@ -1053,7 +1059,7 @@ class Model:
 
                             level3_node = {
                                 "name": level3_name,
-                                "value": int(level3_count)
+                                "value": int(level3_count),
                             }
                             level2_node["children"].append(level3_node)
 
@@ -1080,17 +1086,16 @@ class Model:
                         continue
 
                     issue1_node = {"name": issue1_name, "children": []}
-                    issue1_data = filtered_data[filtered_data["涉及问题(1)"] == issue1_name]
+                    issue1_data = filtered_data[
+                        filtered_data["涉及问题(1)"] == issue1_name
+                    ]
 
                     issue2_counts = issue1_data["涉及问题(2)"].value_counts()
                     for issue2_name, issue2_count in issue2_counts.items():
                         if pd.isna(issue2_name) or issue2_name == "":
                             continue
 
-                        issue2_node = {
-                            "name": issue2_name,
-                            "value": int(issue2_count)
-                        }
+                        issue2_node = {"name": issue2_name, "value": int(issue2_count)}
                         issue1_node["children"].append(issue2_node)
 
                     if issue1_node["children"]:  # 只添加有子节点的节点
@@ -1103,6 +1108,209 @@ class Model:
 
         except Exception as e:
             logger.error(f"获取旭日图数据失败: {e}")
+            return {"error": str(e)}
+
+    def get_quadrant_data(
+        self,
+        start_date=None,
+        end_date=None,
+        companies=None,
+        industries=None,
+        categories=None,
+        industry_level1=None,
+        industry_level2=None,
+    ):
+        """获取聚类分析数据
+
+        横坐标：投诉数量
+        纵坐标：涉及问题分类数量
+        此方法按企业聚合数据
+        """
+        try:
+            logger.info(
+                f"获取聚类分析数据，筛选条件: start_date={start_date}, end_date={end_date}"
+            )
+            filtered_data = self._get_filtered_data_enhanced(
+                start_date,
+                end_date,
+                companies,
+                industries,
+                categories,
+                industry_level1,
+                industry_level2,
+            )
+
+            if filtered_data.empty:
+                logger.warning("筛选后数据为空")
+                return {"nodes": []}
+
+            # 检查必要的字段
+            if "企业名称" not in filtered_data.columns:
+                return {"error": "数据中缺少企业名称字段"}
+            if "问题分类" not in filtered_data.columns:
+                return {"error": "数据中缺少问题分类字段"}
+
+            # 按企业聚合
+            # 1. 投诉数量 (count) - X轴
+            company_counts = filtered_data["企业名称"].value_counts()
+
+            # 2. 涉及问题分类数量 (issue_diversity) - Y轴
+            # Prioritize "涉及问题(2)"
+            diversity_field = None
+            if "涉及问题(2)" in filtered_data.columns:
+                diversity_field = "涉及问题(2)"
+            elif "涉及问题2" in filtered_data.columns:
+                diversity_field = "涉及问题2"
+            elif "涉及问题" in filtered_data.columns:
+                diversity_field = "涉及问题"
+            else:
+                diversity_field = "问题分类"  # fallback
+
+            company_diversity = filtered_data.groupby("企业名称")[
+                diversity_field
+            ].nunique()
+
+            # 2.5 Calculate dominant category for each company (投诉类型)
+            company_category = {}
+            category_field = "问题分类"
+            if category_field in filtered_data.columns:
+                # Group by Company and Category, size
+                cat_counts = (
+                    filtered_data.groupby(["企业名称", category_field])
+                    .size()
+                    .reset_index(name="cnt")
+                )
+                # Sort by count desc
+                cat_counts = cat_counts.sort_values("cnt", ascending=False)
+                # Keep top 1
+                most_frequent = cat_counts.drop_duplicates("企业名称")
+                company_category = dict(
+                    zip(most_frequent["企业名称"], most_frequent[category_field])
+                )
+
+            # 3. 计算最小投诉间隔 (min_interval)
+            company_min_intervals = {}
+            if "日期" in filtered_data.columns:
+                # 确保日期列为datetime类型
+                if not pd.api.types.is_datetime64_any_dtype(filtered_data["日期"]):
+                    filtered_data["日期"] = pd.to_datetime(filtered_data["日期"])
+
+                # 按企业分组获取日期列表
+                company_dates = filtered_data.groupby("企业名称")["日期"].apply(list)
+
+                for company, dates in company_dates.items():
+                    if len(dates) < 2:
+                        company_min_intervals[company] = (
+                            9999  # 只有一条投诉，视为间隔无穷大
+                        )
+                    else:
+                        # 排序并计算相邻日期差值
+                        sorted_dates = sorted([d for d in dates if pd.notna(d)])
+                        if len(sorted_dates) < 2:
+                            company_min_intervals[company] = 9999
+                            continue
+
+                        # 计算最小间隔（天）
+                        min_diff = 9999
+                        for i in range(1, len(sorted_dates)):
+                            diff = (sorted_dates[i] - sorted_dates[i - 1]).days
+                            if diff < min_diff:
+                                min_diff = diff
+                        company_min_intervals[company] = min_diff
+
+            # 4. 构建结果列表
+            nodes = []
+            max_count = 0
+            max_diversity = 0
+
+            for company in company_counts.index:
+                if pd.isna(company) or company == "":
+                    continue
+
+                count = int(company_counts[company])
+                diversity = int(company_diversity.get(company, 0))
+                min_interval = int(company_min_intervals.get(company, 9999))
+                category = company_category.get(company, "其他")
+
+                max_count = max(max_count, count)
+                max_diversity = max(max_diversity, diversity)
+
+                nodes.append(
+                    {
+                        "name": company,
+                        "count": count,  # 投诉数量 (X轴)
+                        "diversity": diversity,  # 问题多样性 (Y轴)
+                        "value": count,  # 大小：投诉数量
+                        "category": category,  # 颜色：主要投诉问题分类
+                        "min_interval": min_interval,  # 最小投诉间隔
+                    }
+                )
+
+            logger.info(f"生成四象限图数据完成: {len(nodes)} 个节点")
+            return {
+                "nodes": nodes,
+                "x_max": max_count,
+                "y_max": max_diversity,
+                "x_label": "投诉总量 (影响广度)",
+                "y_label": "涉及问题 (业务漏洞)",
+            }
+
+        except Exception as e:
+            logger.error(f"获取聚类数据失败: {e}")
+            return {"error": str(e)}
+
+    def get_company_details(self, company_name, start_date=None, end_date=None):
+        """获取企业投诉详情列表"""
+        try:
+            # 使用增强筛选获取基础数据
+            filtered_data = self._get_filtered_data_enhanced(
+                start_date=start_date, end_date=end_date, companies=[company_name]
+            )
+
+            if filtered_data.empty:
+                return {"data": []}
+
+            # 选择需要的字段
+            columns = filtered_data.columns.tolist()
+
+            # 映射目标字段
+            target_fields = {
+                "time": ["市派单时间", "派单时间", "日期", "时间"],
+                "desc": ["问题详细描述", "问题描述", "投诉内容", "内容"],
+                "reply": ["回复内容", "办理结果", "处理结果", "回复"],
+                "issue1": ["涉及问题(1)", "涉及问题1", "涉及问题"],
+                "issue2": ["涉及问题(2)", "涉及问题2"],
+            }
+
+            selected_fields = {}
+            for key, candidates in target_fields.items():
+                for field in candidates:
+                    if field in columns:
+                        selected_fields[key] = field
+                        break
+
+            # 构建结果
+            result = []
+            # 按时间倒序排列
+            if selected_fields.get("time"):
+                filtered_data = filtered_data.sort_values(
+                    by=selected_fields["time"], ascending=False
+                )
+
+            for _, row in filtered_data.iterrows():
+                item = {
+                    "time": str(row.get(selected_fields.get("time"), "")),
+                    "desc": str(row.get(selected_fields.get("desc"), "无描述")),
+                    "reply": str(row.get(selected_fields.get("reply"), "无回复")),
+                    "issue1": str(row.get(selected_fields.get("issue1"), "")),
+                    "issue2": str(row.get(selected_fields.get("issue2"), "")),
+                }
+                result.append(item)
+
+            return {"data": result}
+
+        except Exception as e:
+            logger.error(f"获取企业详情失败: {e}")
             return {"error": str(e)}
 
     def get_sankey_data(
@@ -1120,7 +1328,9 @@ class Model:
         诉求流转：案卷来源 -> 行业名称(1) -> 行业名称(2) -> 处理单位
         """
         try:
-            logger.info(f"获取桑基图数据，筛选条件: start_date={start_date}, end_date={end_date}, companies={companies}, industries={industries}, categories={categories}")
+            logger.info(
+                f"获取桑基图数据，筛选条件: start_date={start_date}, end_date={end_date}, companies={companies}, industries={industries}, categories={categories}"
+            )
             filtered_data = self._get_filtered_data_enhanced(
                 start_date,
                 end_date,
@@ -1145,12 +1355,22 @@ class Model:
                     return {"error": f"数据中缺少列: {col}"}
 
             logger.info(f"案卷来源非空数量: {filtered_data['案卷来源'].notna().sum()}")
-            logger.info(f"行业名称(1)非空数量: {filtered_data['行业名称(1)'].notna().sum()}")
-            logger.info(f"行业名称(2)非空数量: {filtered_data['行业名称(2)'].notna().sum()}")
+            logger.info(
+                f"行业名称(1)非空数量: {filtered_data['行业名称(1)'].notna().sum()}"
+            )
+            logger.info(
+                f"行业名称(2)非空数量: {filtered_data['行业名称(2)'].notna().sum()}"
+            )
             logger.info(f"处理单位非空数量: {filtered_data['处理单位'].notna().sum()}")
 
             # 统计四层关系：来源 -> 行业名称(1) -> 行业名称(2) -> 处理单位
-            sankey_data = filtered_data.groupby(["案卷来源", "行业名称(1)", "行业名称(2)", "处理单位"]).size().reset_index(name="value")
+            sankey_data = (
+                filtered_data.groupby(
+                    ["案卷来源", "行业名称(1)", "行业名称(2)", "处理单位"]
+                )
+                .size()
+                .reset_index(name="value")
+            )
 
             # 处理空值，将行业名称(2)空值替换为"空白"
             sankey_data["行业名称(2)"] = sankey_data["行业名称(2)"].fillna("空白")
@@ -1158,12 +1378,12 @@ class Model:
 
             # 过滤掉其他空值
             sankey_data = sankey_data[
-                (sankey_data["案卷来源"].notna()) &
-                (sankey_data["行业名称(1)"].notna()) &
-                (sankey_data["处理单位"].notna()) &
-                (sankey_data["案卷来源"] != "") &
-                (sankey_data["行业名称(1)"] != "") &
-                (sankey_data["处理单位"] != "")
+                (sankey_data["案卷来源"].notna())
+                & (sankey_data["行业名称(1)"].notna())
+                & (sankey_data["处理单位"].notna())
+                & (sankey_data["案卷来源"] != "")
+                & (sankey_data["行业名称(1)"] != "")
+                & (sankey_data["处理单位"] != "")
             ]
 
             if sankey_data.empty:
@@ -1202,7 +1422,7 @@ class Model:
                 source_to_industry_l1 = {
                     "source": node_map[row["案卷来源"]],
                     "target": node_map[row["行业名称(1)"]],
-                    "value": int(row["value"])
+                    "value": int(row["value"]),
                 }
                 links.append(source_to_industry_l1)
 
@@ -1210,7 +1430,7 @@ class Model:
                 industry_l1_to_l2 = {
                     "source": node_map[row["行业名称(1)"]],
                     "target": node_map[row["行业名称(2)"]],
-                    "value": int(row["value"])
+                    "value": int(row["value"]),
                 }
                 links.append(industry_l1_to_l2)
 
@@ -1218,7 +1438,7 @@ class Model:
                 industry_l2_to_unit = {
                     "source": node_map[row["行业名称(2)"]],
                     "target": node_map[row["处理单位"]],
-                    "value": int(row["value"])
+                    "value": int(row["value"]),
                 }
                 links.append(industry_l2_to_unit)
 
@@ -1234,12 +1454,11 @@ class Model:
             # 将字典转换回列表
             merged_links = list(links_dict.values())
 
-            result = {
-                "nodes": nodes,
-                "links": merged_links
-            }
+            result = {"nodes": nodes, "links": merged_links}
 
-            logger.info(f"生成桑基图数据完成: {len(nodes)} 个节点, {len(links)} 个原始链接, {len(merged_links)} 个合并后链接")
+            logger.info(
+                f"生成桑基图数据完成: {len(nodes)} 个节点, {len(links)} 个原始链接, {len(merged_links)} 个合并后链接"
+            )
             return result
 
         except Exception as e:

@@ -66,10 +66,6 @@ export const filterData = (params: ApiParams) => {
   return apiClient.post('/data/filter', params)
 }
 
-export const getDataFields = () => {
-  return apiClient.get('/data/fields')
-}
-
 // ============ 分析相关接口 ============
 
 export const analyzeTimeSeries = (params: ApiParams) => {
@@ -106,9 +102,14 @@ export const getSunburstData = (params: ApiParams) => {
   return apiClient.post('/dashboard/sunburst', params)
 }
 
-export const getSankeyData = (params: ApiParams) => {
-  return apiClient.post('/dashboard/sankey', params)
+export const getQuadrantData = (params: ApiParams) => {
+  return apiClient.post('/dashboard/quadrant', params)
 }
+
+export const getCompanyDetails = (params: ApiParams) => {
+  return apiClient.post('/dashboard/company-details', params)
+}
+
 
 // ============ 兼容原va-framework接口 ============
 
@@ -145,30 +146,30 @@ export const useComplaintStore = defineStore('complaint', {
     // 系统状态
     systemData: null as any,
     loading: false,
-    
+
     // 数据状态
     dataPreview: [] as any[],
     totalRecords: 0,
     dataFields: [] as any[],
-    
+
     // 分析状态
     analysisResults: null as any,
     reportData: null as any,
-    
+
     // 时间范围
     dateInterval: ['2020-01-01', '2024-12-31'] as string[],
-    
+
     // 筛选条件
     selectedEntities: [] as any[],
     filterConditions: {} as Record<string, any>
   }),
-  
+
   getters: {
     // 获取可用的数据字段
     availableFields: (state) => {
       return state.dataFields || []
     },
-    
+
     // 获取系统状态摘要
     systemSummary: (state) => {
       if (!state.systemData) return null
@@ -179,7 +180,7 @@ export const useComplaintStore = defineStore('complaint', {
       }
     }
   },
-  
+
   actions: {
     // 初始化系统数据
     async initialize() {
@@ -189,12 +190,12 @@ export const useComplaintStore = defineStore('complaint', {
           getSystemData(),
           getDataPreview(10)
         ])
-        
+
         this.systemData = systemResponse.data
         this.dataPreview = previewResponse.data.sample_data || []
         this.totalRecords = previewResponse.data.total_records || 0
         this.dataFields = previewResponse.data.fields || []
-        
+
         console.log('系统初始化完成')
       } catch (error) {
         console.error('系统初始化失败:', error)
@@ -202,7 +203,7 @@ export const useComplaintStore = defineStore('complaint', {
         this.loading = false
       }
     },
-    
+
     // 更新数据预览
     async updateDataPreview(limit = 10) {
       try {
@@ -213,7 +214,7 @@ export const useComplaintStore = defineStore('complaint', {
         console.error('更新数据预览失败:', error)
       }
     },
-    
+
     // 执行时序分析
     async performTimeSeriesAnalysis(params: ApiParams) {
       this.loading = true
@@ -228,7 +229,7 @@ export const useComplaintStore = defineStore('complaint', {
         this.loading = false
       }
     },
-    
+
     // 生成分析报告
     async createReport(params: ApiParams) {
       this.loading = true
@@ -243,7 +244,7 @@ export const useComplaintStore = defineStore('complaint', {
         this.loading = false
       }
     },
-    
+
     // 通用HTTP GET请求
     async get(api: string, callback: ((data: any) => void) | null = null) {
       try {
@@ -255,7 +256,7 @@ export const useComplaintStore = defineStore('complaint', {
         throw error
       }
     },
-    
+
     // 通用HTTP POST请求
     async post(api: string, params: ApiParams, callback: ((data: any) => void) | null = null) {
       try {
