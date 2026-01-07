@@ -1,8 +1,10 @@
 
 # va-framework
-
+组里服务器代理
+```bash
 source /etc/profile.d/clash.sh
 proxy_on
+```
 ## Begin
 ```bash
 cd server
