@@ -645,15 +645,21 @@ class Model:
                     "companies": [],
                     "industry_level1": [],
                     "industry_level2": [],
+                    "industry_level3": [],
                     "industry_classification": [],
                     "categories": [],
+                    "issue_level1": [],
+                    "issue_level2": [],
                 }
 
             companies = []
             industry_level1 = []  # 行业名称(1) - 大类
             industry_level2 = []  # 行业名称(2) - 中类
+            industry_level3 = []  # 行业名称(3) - 小类
             industry_classification = []  # 行业分类 - 详细分类
             categories = []
+            issue_level1 = []  # 涉及问题(1)
+            issue_level2 = []  # 涉及问题(2)
 
             # 获取企业列表（包含空值选项）
             if "企业名称" in self._data_cache.columns:
@@ -690,6 +696,17 @@ class Model:
                 if null_count > 0:
                     industry_level2.append(f"[空值] ({null_count}条记录)")
 
+            # 获取行业小类（行业名称3）
+            if "行业名称(3)" in self._data_cache.columns:
+                non_null_level3 = (
+                    self._data_cache["行业名称(3)"].dropna().unique().tolist()
+                )
+                industry_level3.extend(sorted(non_null_level3))
+
+                null_count = self._data_cache["行业名称(3)"].isnull().sum()
+                if null_count > 0:
+                    industry_level3.append(f"[空值] ({null_count}条记录)")
+
             # 获取详细行业分类
             if "行业分类" in self._data_cache.columns:
                 non_null_classification = (
@@ -712,16 +729,41 @@ class Model:
                 if null_count > 0:
                     categories.append(f"[空值] ({null_count}条记录)")
 
+            # 获取涉及问题(1)
+            if "涉及问题(1)" in self._data_cache.columns:
+                non_null_issue1 = (
+                    self._data_cache["涉及问题(1)"].dropna().unique().tolist()
+                )
+                issue_level1.extend(sorted(non_null_issue1))
+
+                null_count = self._data_cache["涉及问题(1)"].isnull().sum()
+                if null_count > 0:
+                    issue_level1.append(f"[空值] ({null_count}条记录)")
+
+            # 获取涉及问题(2)
+            if "涉及问题(2)" in self._data_cache.columns:
+                non_null_issue2 = (
+                    self._data_cache["涉及问题(2)"].dropna().unique().tolist()
+                )
+                issue_level2.extend(sorted(non_null_issue2))
+
+                null_count = self._data_cache["涉及问题(2)"].isnull().sum()
+                if null_count > 0:
+                    issue_level2.append(f"[空值] ({null_count}条记录)")
+
             logger.info(
-                f"筛选选项统计: 企业数={len(companies)}, 行业大类={len(industry_level1)}, 行业中类={len(industry_level2)}, 详细行业分类={len(industry_classification)}, 问题分类数={len(categories)}"
+                f"筛选选项统计: 企业数={len(companies)}, 行业大类={len(industry_level1)}, 行业中类={len(industry_level2)}, 行业小类={len(industry_level3)}, 详细行业分类={len(industry_classification)}, 问题分类数={len(categories)}, 涉及问题(1)={len(issue_level1)}, 涉及问题(2)={len(issue_level2)}"
             )
 
             return {
                 "companies": companies,  # 显示全部值，不截断
                 "industry_level1": industry_level1,  # 行业大类
                 "industry_level2": industry_level2,  # 行业中类
+                "industry_level3": industry_level3,  # 行业小类
                 "industry_classification": industry_classification,  # 详细行业分类
                 "categories": categories,
+                "issue_level1": issue_level1,  # 涉及问题(1)
+                "issue_level2": issue_level2,  # 涉及问题(2)
             }
 
         except Exception as e:
@@ -730,8 +772,11 @@ class Model:
                 "companies": [],
                 "industry_level1": [],
                 "industry_level2": [],
+                "industry_level3": [],
                 "industry_classification": [],
                 "categories": [],
+                "issue_level1": [],
+                "issue_level2": [],
             }
 
     def get_dashboard_stats(

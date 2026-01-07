@@ -8,72 +8,81 @@
         <!-- 1. Console (Compact with More Filters) -->
         <div class="panel-item console-wrapper">
           <div class="console-content-compact">
-            <el-form :model="filters" label-width="35px" size="small" class="compact-form">
+            <el-form :model="filters" size="small" class="compact-form no-labels">
               <!-- 日期范围 -->
               <el-row :gutter="4">
                 <el-col :span="12">
-                  <el-form-item label="开始" class="mb-3">
-                    <el-date-picker v-model="filters.startDate" type="date" placeholder="开始" value-format="YYYY-MM-DD" style="width: 100%" :clearable="false" size="small" />
+                  <el-form-item class="mb-3">
+                    <el-date-picker v-model="filters.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width: 100%" :clearable="false" size="small" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="结束" class="mb-3">
-                    <el-date-picker v-model="filters.endDate" type="date" placeholder="结束" value-format="YYYY-MM-DD" style="width: 100%" :clearable="false" size="small" />
+                  <el-form-item class="mb-3">
+                    <el-date-picker v-model="filters.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 100%" :clearable="false" size="small" />
                   </el-form-item>
                 </el-col>
               </el-row>
               
               <!-- 企业筛选 -->
-              <el-form-item label="企业" class="mb-3">
-                <el-select v-model="filters.selectedCompanies" multiple collapse-tags collapse-tags-tooltip placeholder="全部企业" style="width: 100%" size="small">
+              <el-form-item class="mb-3">
+                <el-select v-model="filters.selectedCompanies" multiple collapse-tags collapse-tags-tooltip placeholder="企业" style="width: 100%" size="small">
                   <el-option v-for="c in filterOptions.companies" :key="c" :label="c" :value="c" />
                 </el-select>
               </el-form-item>
               
-              <!-- 行业筛选 -->
-              <el-form-item label="分类" class="mb-3">
-                <el-select v-model="filters.selectedIndustries" multiple collapse-tags collapse-tags-tooltip placeholder="行业分类" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.industries" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
+              <!-- 行业筛选（两列布局） -->
+              <div style="display: flex; gap: 8px;" class="mb-3">
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIndustries" multiple collapse-tags collapse-tags-tooltip placeholder="行业分类" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.industry_classification" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+                
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIndustryLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(1)" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.industry_level1" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+              </div>
               
-              <el-form-item label="行1" class="mb-3">
-                <el-select v-model="filters.selectedIndustryLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(1)" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.industry_level1" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
+              <div style="display: flex; gap: 8px;" class="mb-3">
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIndustryLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(2)" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.industry_level2" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+                
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIndustryLevel3" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(3)" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.industry_level3" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+              </div>
               
-              <el-form-item label="行2" class="mb-3">
-                <el-select v-model="filters.selectedIndustryLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(2)" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.industry_level2" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
-              
-              <el-form-item label="行3" class="mb-3">
-                <el-select v-model="filters.selectedIndustryLevel3" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(3)" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.industry_level3" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
               
               <!-- 问题筛选 -->
-              <el-form-item label="问题" class="mb-3">
+              <el-form-item class="mb-3">
                 <el-select v-model="filters.selectedCategories" multiple collapse-tags collapse-tags-tooltip placeholder="问题分类" style="width: 100%" size="small">
                   <el-option v-for="c in filterOptions.categories" :key="c" :label="c" :value="c" />
                 </el-select>
               </el-form-item>
               
-              <el-form-item label="问1" class="mb-3">
-                <el-select v-model="filters.selectedIssueLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(1)" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.issue_level1" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
               
-              <el-form-item label="问2" class="mb-3">
-                <el-select v-model="filters.selectedIssueLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(2)" style="width: 100%" size="small">
-                  <el-option v-for="c in filterOptions.issue_level2" :key="c" :label="c" :value="c" />
-                </el-select>
-              </el-form-item>
-              
+              <!-- 涉及问题筛选（两列布局） -->
+              <div style="display: flex; gap: 8px;" class="mb-3">
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIssueLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(1)" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.issue_level1" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+                
+                <el-form-item style="flex: 1; margin-bottom: 0;">
+                  <el-select v-model="filters.selectedIssueLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(2)" style="width: 100%" size="small">
+                    <el-option v-for="c in filterOptions.issue_level2" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </el-form-item>
+              </div>
+
               <!-- 操作按钮 -->
               <div class="filter-actions">
                 <el-button @click="loadDashboardData" type="primary" size="small" plain style="width: 48%">刷新</el-button>
@@ -255,7 +264,7 @@ const filters = ref({
 const filterOptions = ref({
   companies: [],
   categories: [],
-  industries: [],
+  industry_classification: [],
   industry_level1: [],
   industry_level2: [],
   industry_level3: [],
@@ -361,7 +370,10 @@ const loadTrendData = async () => {
 const renderTrendChart = () => {
     if (!trendChart.value || !trendData.value.length) return
     const container = trendChart.value
+    
+    // 清理旧的DOM元素，防止内存泄漏
     d3.select(container).selectAll("*").remove()
+    d3.selectAll(".trend-tooltip").remove()
     
     const margin = {top: 10, right: 10, bottom: 20, left: 30}
     const width = container.offsetWidth - margin.left - margin.right
@@ -557,9 +569,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 全局样式：确保页面铺满整个视口 */
+:global(html, body, #app) {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 .dashboard-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
   height: 100vh;
-  padding: 0; /* Zero padding as requested */
+  padding: 0;
   background: #f8f9fa;
   overflow: hidden;
   box-sizing: border-box;
@@ -575,10 +600,11 @@ onMounted(() => {
 .col-left, .col-center, .col-right-1, .col-right-2 {
   display: flex;
   flex-direction: column;
-  gap: 0; /* Zero gap between modules */
-  min-height: 0; 
+  gap: 0;
+  min-height: 0;
   height: 100%;
-  border-right: 1px solid #e0e0e0; /* Visual separator */
+  overflow: hidden; /* 防止子元素溢出导致整体页面滚动 */
+  border-right: 1px solid #e0e0e0;
 }
 
 .col-right-2 {
@@ -650,8 +676,10 @@ onMounted(() => {
 .timeseries-wrapper {
   flex: 1;
   min-height: 200px;
+  max-height: 350px; /* 添加最大高度，保证自适应的同时不会过高 */
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 防止外层溢出 */
 }
 
 .filter-actions {
@@ -707,7 +735,9 @@ onMounted(() => {
 .scrollable-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 5px;
+    min-height: 0;
 }
 .chart-mini-title { font-size: 10px; color: #999; margin: 2px 0 0 5px; }
 .empty-text { font-size: 12px; color: #ccc; text-align: center; margin-top: 20px; }

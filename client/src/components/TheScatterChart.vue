@@ -34,8 +34,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick, computed } from 'vue'
 import * as d3 from 'd3'
+import { debounce } from 'lodash-es'
 import { getQuadrantData } from '@/stores/complaint-store'
 import { ElMessage } from 'element-plus'
 import { Setting } from '@element-plus/icons-vue'
@@ -139,7 +140,7 @@ const renderChart = () => {
       return
     } else {
       console.error('散点图容器尺寸始终为0，放弃渲染')
-      retryCount = 0 // 重置重试计数器
+      retryCount = 0
       return
     }
   }
@@ -147,11 +148,13 @@ const renderChart = () => {
   // 成功开始渲染，重置重试计数器
   retryCount = 0
   
+  // 清理旧的DOM元素，防止内存泄漏
   d3.select(container).selectAll("*").remove()
+  d3.selectAll(".scatter-tooltip").remove()
   
   const width = container.clientWidth
   const height = container.clientHeight
-  const margin = { top: 20, right: 30, bottom: 40, left: 60 } // 增加左边距以容纳更长的Y轴标签
+  const margin = { top: 20, right: 30, bottom: 40, left: 60 }
   const innerWidth = width - margin.left - margin.right
   const innerHeight = height - margin.top - margin.bottom
   
@@ -159,7 +162,7 @@ const renderChart = () => {
   const validData = data.value.filter(d => {
     const hasValidCount = d.count != null && !isNaN(d.count) && d.count >= 0
     const hasValidDiversity = d.diversity != null && !isNaN(d.diversity) && d.diversity >= 0
-    const aboveThreshold = d.count > countThreshold.value // 投诉数量大于阈值
+    const aboveThreshold = d.count > countThreshold.value
     return hasValidCount && hasValidDiversity && aboveThreshold
   })
   
@@ -175,7 +178,7 @@ const renderChart = () => {
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`)
   
-  // 数据处理
+  // 计算坐标并进行点聚合
   // X轴使用Log2 (加1避免log(0))
   const xDomain = [0, d3.max(validData, d => Math.log2(d.count + 1)) * 1.1 || 10]
   const yDomain = [0, d3.max(validData, d => d.diversity) * 1.1 || 5]
@@ -190,10 +193,51 @@ const renderChart = () => {
     .range([innerHeight, 0])
     .nice()
 
-  // 颜色定义：蓝色=正常企业，红色=预警企业（频繁投诉）
+  // 点聚合：将相同坐标的点合并
+  const aggregatedData = new Map()
+  
+  validData.forEach(d => {
+    const x = Math.round(xScale(Math.log2(d.count + 1)))
+    const y = Math.round(yScale(d.diversity))
+    const key = `${x},${y}`
+    
+    if (aggregatedData.has(key)) {
+      const existing = aggregatedData.get(key)
+      existing.count_sum += d.count
+      existing.companies.push(d.name)
+      existing.overlaps += 1
+      // 保留预警状态（任一预警则为预警）
+      if (d.min_interval < 30) {
+        existing.is_warning = true
+      }
+    } else {
+      aggregatedData.set(key, {
+        x,
+        y,
+        count_sum: d.count,
+        diversity: d.diversity,
+        companies: [d.name],
+        overlaps: 1,
+        is_warning: d.min_interval < 30,
+        category: d.category || '未知',
+        original_data: d
+      })
+    }
+  })
+  
+  const aggregatedNodes = Array.from(aggregatedData.values())
+  console.log(`原始数据点: ${validData.length}, 聚合后: ${aggregatedNodes.length}`)
+  
+  // 颜色定义
   const normalColor = "#409eff"  // 蓝色 - 正常企业
-  const warningColor = "#f56c6c" // 红色 - 预警企业（min_interval < 30天）
-  const selectedColor = "#e6a23c" // 黄色 - 框选后的颜色
+  const warningColor = "#f56c6c" // 红色 - 预警企业
+  const selectedColor = "#e6a23c" // 黄色 - 框选后
+  
+  // 计算颜色深浅的比例尺（基于重叠数量）
+  const maxOverlaps = d3.max(aggregatedNodes, d => d.overlaps) || 1
+  const opacityScale = d3.scaleLinear()
+    .domain([1, maxOverlaps])
+    .range([0.4, 1.0])  // 透明度从0.4到1.0
   
   // 绘制轴
   svg.append("g")
@@ -215,46 +259,27 @@ const renderChart = () => {
     .attr("fill", "#666")
     .attr("text-anchor", "end")
     .text("涉及问题(2)类型个数")
-    
-  // Force Simulation
-  // 初始化节点位置
-  validData.forEach(d => {
-    d.x = xScale(Math.log2(d.count + 1))
-    d.y = yScale(d.diversity)
-  })
-
-  const simulation = d3.forceSimulation(validData)
-    .force("x", d3.forceX(d => xScale(Math.log2(d.count + 1))).strength(1)) // 强力拉向X轴目标
-    .force("y", d3.forceY(d => yScale(d.diversity)).strength(1)) // 强力拉向Y轴目标
-    .force("collide", d3.forceCollide(dotSize.value + 1)) // 避免重叠
-    .stop()
-
-  // 预计算迭代
-  for (let i = 0; i < 120; ++i) simulation.tick()
-
-  // 绘制点
+  
+  // 绘制聚合后的点（无力导向模拟）
   const circles = svg.selectAll(".dot")
-    .data(validData)
+    .data(aggregatedNodes)
     .enter().append("circle")
     .attr("class", "dot")
-    .attr("cx", d => d.x) // 使用模拟后的位置
+    .attr("cx", d => d.x)
     .attr("cy", d => d.y)
-    .attr("r", dotSize.value)
-    .attr("fill", d => {
-        // 红色 = 预警企业（频繁投诉），蓝色 = 正常企业
-        if (d.min_interval < 30) return warningColor
-        return normalColor
-    })
-    .attr("opacity", 0.7)
+    .attr("r", dotSize.value) // 固定半径
+    .attr("fill", d => d.is_warning ? warningColor : normalColor)
+    .attr("opacity", d => opacityScale(d.overlaps)) // 颜色深浅表示重叠数量
     .attr("stroke", "#fff")
     .attr("stroke-width", 1)
     .style("cursor", "pointer")
     .on("click", (event, d) => {
       event.stopPropagation()
-      emit('click-node', d)
+      // 如果有多个企业重叠，点击时显示第一个
+      emit('click-node', d.original_data)
     })
     
-  // 添加交互 Tooltip
+  // Tooltip
   const tooltip = d3.select("body").append("div")
     .attr("class", "scatter-tooltip")
     .style("opacity", 0)
@@ -269,24 +294,44 @@ const renderChart = () => {
     
   circles
     .on("mouseover", function(event, d) {
-      d3.select(this).attr("r", dotSize.value + 2).attr("opacity", 1)
+      d3.select(this)
+        .attr("r", dotSize.value + 2)
+        .attr("opacity", 1)
+      
       tooltip.transition().duration(200).style("opacity", 0.9)
-      tooltip.html(`
-        <strong>${d.name}</strong><br/>
-        log2(投诉总数): ${Math.log2(d.count + 1).toFixed(2)} (${d.count})<br/>
-        涉及问题(2)类型个数: ${d.diversity}<br/>
-        主要问题: ${d.category || '未知'}
-      `)
-      .style("left", (event.pageX + 10) + "px")
-      .style("top", (event.pageY - 28) + "px")
+      
+      let tooltipHtml = ''
+      if (d.overlaps > 1) {
+        tooltipHtml = `
+          <strong>聚合点 (${d.overlaps}个企业)</strong><br/>
+          ${d.companies.slice(0, 5).join('<br/>')}
+          ${d.overlaps > 5 ? '<br/>...' : ''}<br/>
+          <hr style="margin: 4px 0; border-color: #666;"/>
+          总投诉数: ${d.count_sum}<br/>
+          涉及问题(2)类型个数: ${d.diversity}
+        `
+      } else {
+        tooltipHtml = `
+          <strong>${d.companies[0]}</strong><br/>
+          log2(投诉总数): ${Math.log2(d.count_sum + 1).toFixed(2)} (${d.count_sum})<br/>
+          涉及问题(2)类型个数: ${d.diversity}<br/>
+          主要问题: ${d.category}
+        `
+      }
+      
+      tooltip.html(tooltipHtml)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 28) + "px")
     })
     .on("mousemove", function(event) {
       tooltip
         .style("left", (event.pageX + 10) + "px")
         .style("top", (event.pageY - 28) + "px")
     })
-    .on("mouseout", function() {
-      d3.select(this).attr("r", dotSize.value).attr("opacity", 0.7)
+    .on("mouseout", function(event, d) {
+      d3.select(this)
+        .attr("r", dotSize.value)
+        .attr("opacity", opacityScale(d.overlaps))
       tooltip.transition().duration(500).style("opacity", 0)
     })
     
@@ -302,11 +347,7 @@ const renderChart = () => {
   function brushed(event) {
     if (!event.selection) {
       emit('update:selection', [])
-      circles.attr("fill", d => {
-          // 恢复原始颜色：红色=预警，蓝色=正常
-          if (d.min_interval < 30) return warningColor
-          return normalColor
-      })
+      circles.attr("fill", d => d.is_warning ? warningColor : normalColor)
       return
     }
     
@@ -314,18 +355,16 @@ const renderChart = () => {
     const selected = []
     
     circles.attr("fill", d => {
-      const cx = d.x // Use simulated coordinates
+      const cx = d.x
       const cy = d.y
-      // 判断点是否在矩形内
       const isSelected = x0 <= cx && cx <= x1 && y0 <= cy && cy <= y1
       
       if (isSelected) {
-        selected.push(d.name)
-        return selectedColor // 选中后变黄色
+        // 添加所有聚合点包含的企业
+        selected.push(...d.companies)
+        return selectedColor
       } else {
-        // 未选中时：红色=预警，蓝色=正常
-        if (d.min_interval < 30) return warningColor
-        return normalColor
+        return d.is_warning ? warningColor : normalColor
       }
     })
     
@@ -334,9 +373,8 @@ const renderChart = () => {
 
   // 添加图例
   const legend = svg.append("g")
-    .attr("transform", `translate(${innerWidth - 100}, 10)`)
+    .attr("transform", `translate(${innerWidth - 120}, 10)`)
     
-  // 图例项：蓝色=正常企业，红色=预警企业
   const legendItems = [
     { label: '正常企业', color: normalColor },
     { label: '预警企业', color: warningColor }
@@ -344,9 +382,73 @@ const renderChart = () => {
   
   legendItems.forEach((item, i) => {
     const lg = legend.append("g").attr("transform", `translate(0, ${i * 18})`)
-    lg.append("circle").attr("r", 5).attr("fill", item.color).attr("opacity", 0.7)
-    lg.append("text").attr("x", 12).attr("y", 4).text(item.label).style("font-size", "11px").attr("fill", "#666")
+    lg.append("circle")
+      .attr("r", 5)
+      .attr("fill", item.color)
+      .attr("opacity", 0.7)
+    lg.append("text")
+      .attr("x", 12)
+      .attr("y", 4)
+      .text(item.label)
+      .style("font-size", "11px")
+      .attr("fill", "#666")
   })
+  
+  // 添加颜色深浅说明 - 色带
+  const gradientLegend = legend.append("g").attr("transform", `translate(0, ${legendItems.length * 18 + 5})`)
+  
+  // 定义渐变
+  const gradientId = "opacity-gradient"
+  const defs = svg.append("defs")
+  const gradient = defs.append("linearGradient")
+    .attr("id", gradientId)
+    .attr("x1", "0%")
+    .attr("x2", "100%")
+  
+  gradient.append("stop")
+    .attr("offset", "0%")
+    .attr("stop-color", normalColor)
+    .attr("stop-opacity", 0.4)
+  
+  gradient.append("stop")
+    .attr("offset", "100%")
+    .attr("stop-color", normalColor)
+    .attr("stop-opacity", 1.0)
+  
+  // 标题
+  gradientLegend.append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .text("数目多少")
+    .style("font-size", "10px")
+    .style("font-weight", "500")
+    .attr("fill", "#666")
+  
+  // 渐变色带
+  gradientLegend.append("rect")
+    .attr("x", 0)
+    .attr("y", 5)
+    .attr("width", 60)
+    .attr("height", 8)
+    .attr("fill", `url(#${gradientId})`)
+    .attr("stroke", "#ddd")
+    .attr("stroke-width", 0.5)
+  
+  // 左右标签
+  gradientLegend.append("text")
+    .attr("x", 0)
+    .attr("y", 22)
+    .text("少")
+    .style("font-size", "9px")
+    .attr("fill", "#999")
+  
+  gradientLegend.append("text")
+    .attr("x", 60)
+    .attr("y", 22)
+    .text("多")
+    .style("font-size", "9px")
+    .attr("fill", "#999")
+    .attr("text-anchor", "end")
 }
 
 // 暴露 chartRef 更新方法供父组件调用
@@ -354,30 +456,41 @@ defineExpose({
   updateChart: loadData
 })
 
-// 监听配置变化重绘
-watch([dotSize, countThreshold], () => {
-  renderChart()
+// 使用computed生成监听key，避免deep watch导致的性能问题
+const filterKey = computed(() => {
+  return [
+    props.startDate,
+    props.endDate,
+    props.selectedCompanies.join(','),
+    props.selectedIndustries.join(','),
+    props.selectedCategories.join(','),
+    props.selectedIndustryLevel1.join(','),
+    props.selectedIndustryLevel2.join(',')
+  ].join('|')
 })
 
-// 监听属性变化重新加载
-watch(() => [
-  props.startDate,
-  props.endDate,
-  props.selectedCompanies,
-  props.selectedIndustries,
-  props.selectedCategories,
-  props.selectedIndustryLevel1,
-  props.selectedIndustryLevel2
-], () => {
+// 添加防抖的渲染函数，避免频繁重绘
+const debouncedRenderChart = debounce(() => {
+  renderChart()
+}, 300)
+
+// 监听配置变化，使用防抖重绘
+watch([dotSize, countThreshold], debouncedRenderChart)
+
+// 监听筛选条件变化，重新加载数据
+watch(filterKey, () => {
   loadData()
-}, { deep: true })
+})
 
 onMounted(() => {
   loadData()
   if (chartRef.value) {
-    resizeObserver.value = new ResizeObserver(() => {
+    // ResizeObserver也使用防抖，避免频繁触发
+    const debouncedResize = debounce(() => {
       renderChart()
-    })
+    }, 500)
+    
+    resizeObserver.value = new ResizeObserver(debouncedResize)
     resizeObserver.value.observe(chartRef.value)
   }
 })
