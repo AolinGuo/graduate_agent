@@ -15,3 +15,4 @@ server/output/
 LLaMA-Factory/
 server/embedding_model/__pycache__/
 *.pyc
+server/embedding_model/
