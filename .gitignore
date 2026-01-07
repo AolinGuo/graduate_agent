@@ -13,4 +13,5 @@ server/output
 server/checkpoint-375/
 server/output/
 LLaMA-Factory/
-server/embedding_model/
+server/embedding_model/__pycache__/
+*.pyc
