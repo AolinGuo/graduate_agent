@@ -100,7 +100,7 @@ class RAGKnowledgeBase:
             logger.info(f"加载向量化模型: {self.embedding_model_name}")
             self.embeddings = HuggingFaceEmbeddings(
                 model_name=self.embedding_model_name,
-                model_kwargs={'device': 'cpu'},  # 可以改为'cuda'使用GPU
+                model_kwargs={'device': 'cuda','trust_remote_code': True},  # 可以改为'cuda'使用GPU
                 encode_kwargs={'normalize_embeddings': True}
             )
             
