@@ -18,10 +18,9 @@ pip install -r requirements.txt
 
 ```bash
 # 创建模型目录并下载 Youtu-Embedding 模型
-mkdir -p server/embedding_model
-cd server/embedding_model
-git clone https://huggingface.co/tencent/Youtu-Embedding .
-cd ..
+cd server
+hf download Qwen/Qwen3-Embedding-0.6B   --local-dir embedding_model
+
 ```
 
 **注意**: 如果不下载本地模型，系统会自动下载在线模型（约400MB）

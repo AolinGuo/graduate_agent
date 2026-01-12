@@ -51,7 +51,7 @@ if gpu_config["use_single_gpu"]:
     os.environ["CUDA_VISIBLE_DEVICES"] = physical_gpu
     if AI_CONFIG["logging"]["verbose"]:
         logging.getLogger(__name__).info(
-            f"设置使用物理GPU {physical_gpu}，在程序中显示为GPU 0"
+            f"设置使用物理GPU {physical_gpu}"
         )
 
 logger = logging.getLogger(__name__)

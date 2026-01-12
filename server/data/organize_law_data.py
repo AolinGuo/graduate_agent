@@ -63,7 +63,7 @@ def split_standard_law(text, filename):
     source_name = filename.replace('.txt', '')
     
     # 修复正则：使用 (?:...) 非捕获组，避免 split 产生多余空元素
-    article_pattern = r"(?:^|\n)\s*(第[零一二三四五六七八九十百0-9]+条)"
+    article_pattern = r"(?:^|\n)\s*(第[零一二三四五六七八九十百千万0-9]+条)"
     splits = re.split(article_pattern, text)
     
     # 步长为2遍历
