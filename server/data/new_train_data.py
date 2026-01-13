@@ -17,7 +17,7 @@ import re
 # 逻辑2 -> 物理3 (vLLM TP2)
 # 逻辑3 -> 物理4 (vLLM TP3)
 # 逻辑4 -> 物理2 (RAG)
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,3,4,6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,3,4,6"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 VLLM_CONFIG = {
     "model": {
         # 【修改】vLLM 将自动使用可见的前N张卡。这里设为4，即使用 cuda:0,1,2,3
-        "tensor_parallel_size": 4,      
+        "tensor_parallel_size": 1,      
         "dtype": "bfloat16",
         "max_model_len": 16384,
         "gpu_memory_utilization": 0.85, # 使用85%显存（RTX 4090有充足显存）
@@ -235,10 +235,10 @@ def main():
         raw_a = item.get('answer', '')
 
         # 步骤 1: 查询改写 (vLLM GPU 0-3)
-        prompt_rewrite = f"任务：将以下市民投诉转化为标准的法律查询语句。\n【投诉】{raw_q}\n【要求】去隐私，提取核心法律问题，只输出查询语句，不要其他内容。\n请输出查询语句："
+        prompt_rewrite = f"任务：将以下市民诉求提取成一个事件。\n【投诉】{raw_q}\n【要求】去隐私，提取核心事件经过，精简输出。"
         search_query_raw = ai_service.generate_response(
             user_input=prompt_rewrite,
-            system_prompt="你是一个法律检索专家，请直接输出查询语句，不要添加多余内容。",
+            system_prompt="你是一个事件概括专家。",
             temperature=0.1,  # 降低温度，提高准确性
             max_tokens=100
         )
@@ -266,7 +266,7 @@ def main():
 {legal_ctx}
 【事件结果】
 {status}
-【"""
+"""
 
         # 生成回复
         logger.info(f"正在生成回复（数据 {idx+1}/{len(raw_data)}）...")
