@@ -17,7 +17,7 @@ import re
 # 逻辑2 -> 物理3 (vLLM TP2)
 # 逻辑3 -> 物理4 (vLLM TP3)
 # 逻辑4 -> 物理2 (RAG)
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,3,4,6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,3,4,5,6"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
