@@ -373,29 +373,58 @@ class Model:
         data = self._data_cache.copy()
         logger.info(f"原始数据量: {len(data)} 条")
 
-        # 时间筛选
-        if start_date and "日期" in data.columns:
-            try:
-                start_date_obj = pd.to_datetime(start_date).date()
-                # 确保日期字段不为空且有数据
-                if data["日期"].notna().any():
-                    data = data[data["日期"] >= start_date_obj]
-                    logger.info(f"开始日期筛选后: {len(data)} 条")
-                else:
-                    logger.warning("日期字段全部为空，无法进行时间筛选")
-            except Exception as e:
-                logger.error(f"开始日期筛选失败: {e}")
+        # 时间筛选 - 支持多种时间字段
+        date_fields = ["市派单时间", "派单时间", "日期", "时间"]
+        date_column = None
 
-        if end_date and "日期" in data.columns:
-            try:
-                end_date_obj = pd.to_datetime(end_date).date()
-                if data["日期"].notna().any():
-                    data = data[data["日期"] <= end_date_obj]
-                    logger.info(f"结束日期筛选后: {len(data)} 条")
-                else:
-                    logger.warning("日期字段全部为空，无法进行时间筛选")
-            except Exception as e:
-                logger.error(f"结束日期筛选失败: {e}")
+        # 查找可用的时间字段
+        for field in date_fields:
+            if field in data.columns and not data[field].isna().all():
+                date_column = field
+                logger.info(f"使用时间字段进行筛选: {field}")
+                break
+
+        if not date_column:
+            logger.warning("未找到可用的时间字段，无法进行时间筛选")
+        else:
+            # 确保时间字段是datetime类型
+            if not pd.api.types.is_datetime64_any_dtype(data[date_column]):
+                try:
+                    data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+                    logger.info(f"转换时间字段 {date_column} 为datetime类型")
+                except Exception as e:
+                    logger.error(f"转换时间字段 {date_column} 失败: {e}")
+
+            if start_date:
+                try:
+                    start_date_obj = pd.to_datetime(start_date).date()
+                    # 确保日期字段不为空且有数据
+                    if data[date_column].notna().any():
+                        # 对于datetime类型的字段，需要转换为date进行比较
+                        if pd.api.types.is_datetime64_any_dtype(data[date_column]):
+                            data = data[data[date_column].dt.date >= start_date_obj]
+                        else:
+                            data = data[data[date_column] >= start_date_obj]
+                        logger.info(f"开始日期筛选后: {len(data)} 条")
+                    else:
+                        logger.warning(f"{date_column} 字段全部为空，无法进行时间筛选")
+                except Exception as e:
+                    logger.error(f"开始日期筛选失败: {e}")
+
+            if end_date:
+                try:
+                    end_date_obj = pd.to_datetime(end_date).date()
+                    if data[date_column].notna().any():
+                        # 对于datetime类型的字段，需要转换为date进行比较
+                        if pd.api.types.is_datetime64_any_dtype(data[date_column]):
+                            data = data[data[date_column].dt.date <= end_date_obj]
+                        else:
+                            data = data[data[date_column] <= end_date_obj]
+                        logger.info(f"结束日期筛选后: {len(data)} 条")
+                    else:
+                        logger.warning(f"{date_column} 字段全部为空，无法进行时间筛选")
+                except Exception as e:
+                    logger.error(f"结束日期筛选失败: {e}")
 
         # 企业筛选
         if companies and "企业名称" in data.columns:
@@ -829,30 +858,47 @@ class Model:
 
             # 月内重复投诉企业数
             repeat_companies_count = 0
-            if "企业名称" in filtered_data.columns and "日期" in filtered_data.columns:
-                try:
-                    # 按企业和月份分组，统计每个企业每月的投诉次数
-                    filtered_data_copy = filtered_data.copy()
-                    # 确保日期字段是datetime类型
-                    filtered_data_copy["日期"] = pd.to_datetime(
-                        filtered_data_copy["日期"]
-                    )
-                    filtered_data_copy["年月"] = filtered_data_copy[
-                        "日期"
-                    ].dt.to_period("M")
-                    monthly_complaints = filtered_data_copy.groupby(
-                        ["企业名称", "年月"]
-                    ).size()
-                    # 找出在任何月份有多次投诉的企业
-                    repeat_companies = (
-                        monthly_complaints[monthly_complaints > 1]
-                        .groupby("企业名称")
-                        .size()
-                    )
-                    repeat_companies_count = len(repeat_companies)
-                except Exception as e:
-                    logger.error(f"计算月内重复投诉企业数失败: {e}")
-                    repeat_companies_count = 0
+            if "企业名称" in filtered_data.columns:
+                # 查找可用的时间字段
+                date_fields = ["市派单时间", "派单时间", "日期", "时间"]
+                date_column = None
+
+                for field in date_fields:
+                    if field in filtered_data.columns and not filtered_data[field].isna().all():
+                        date_column = field
+                        break
+
+                if date_column:
+                    try:
+                        # 按企业和月份分组，统计每个企业每月的投诉次数
+                        filtered_data_copy = filtered_data.copy()
+                        # 确保日期字段是datetime类型
+                        if not pd.api.types.is_datetime64_any_dtype(filtered_data_copy[date_column]):
+                            filtered_data_copy[date_column] = pd.to_datetime(
+                                filtered_data_copy[date_column], errors="coerce"
+                            )
+
+                        if pd.api.types.is_datetime64_any_dtype(filtered_data_copy[date_column]):
+                            filtered_data_copy["年月"] = filtered_data_copy[
+                                date_column
+                            ].dt.to_period("M")
+                            monthly_complaints = filtered_data_copy.groupby(
+                                ["企业名称", "年月"]
+                            ).size()
+                            # 找出在任何月份有多次投诉的企业
+                            repeat_companies = (
+                                monthly_complaints[monthly_complaints > 1]
+                                .groupby("企业名称")
+                                .size()
+                            )
+                            repeat_companies_count = len(repeat_companies)
+                        else:
+                            logger.warning(f"时间字段 {date_column} 无法转换为datetime类型")
+                    except Exception as e:
+                        logger.error(f"计算月内重复投诉企业数失败: {e}")
+                        repeat_companies_count = 0
+                else:
+                    logger.warning("未找到可用的时间字段，无法计算月内重复投诉企业数")
 
             # 企业投诉量排名（显示全部）
             company_ranking = []
@@ -1325,6 +1371,10 @@ class Model:
                 "reply": ["回复内容", "办理结果", "处理结果", "回复"],
                 "issue1": ["涉及问题(1)", "涉及问题1", "涉及问题"],
                 "issue2": ["涉及问题(2)", "涉及问题2"],
+                "industry1": ["行业名称(1)", "行业名称1", "行业1"],
+                "industry2": ["行业名称(2)", "行业名称2", "行业2"],
+                "industry3": ["行业名称(3)", "行业名称3", "行业3"],
+                "design_issue1": ["设计问题(1)", "设计问题1", "设计问题"],
             }
 
             selected_fields = {}
@@ -1343,12 +1393,22 @@ class Model:
                 )
 
             for _, row in filtered_data.iterrows():
+                def safe_str(value):
+                    """安全地将值转换为字符串，过滤掉NaN和None"""
+                    if pd.isna(value) or str(value).lower() == 'nan':
+                        return ""
+                    return str(value).strip()
+
                 item = {
-                    "time": str(row.get(selected_fields.get("time"), "")),
-                    "desc": str(row.get(selected_fields.get("desc"), "无描述")),
-                    "reply": str(row.get(selected_fields.get("reply"), "无回复")),
-                    "issue1": str(row.get(selected_fields.get("issue1"), "")),
-                    "issue2": str(row.get(selected_fields.get("issue2"), "")),
+                    "time": safe_str(row.get(selected_fields.get("time"), "")),
+                    "desc": safe_str(row.get(selected_fields.get("desc"), "无描述")),
+                    "reply": safe_str(row.get(selected_fields.get("reply"), "无回复")),
+                    "issue1": safe_str(row.get(selected_fields.get("issue1"), "")),
+                    "issue2": safe_str(row.get(selected_fields.get("issue2"), "")),
+                    "industry1": safe_str(row.get(selected_fields.get("industry1"), "")),
+                    "industry2": safe_str(row.get(selected_fields.get("industry2"), "")),
+                    "industry3": safe_str(row.get(selected_fields.get("industry3"), "")),
+                    "design_issue1": safe_str(row.get(selected_fields.get("design_issue1"), "")),
                 }
                 result.append(item)
 

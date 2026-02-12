@@ -18,6 +18,11 @@ pnpm i
 pnpm run dev
 ```
 
+模型微调
+```bash
+cd LlamaFactory
+source myven/bin/activate
+```
 
 ## Client
 

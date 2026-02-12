@@ -12,7 +12,8 @@ server/model-dir/
 server/output
 server/checkpoint-375/
 server/output/
-LLaMA-Factory/
+LlamaFactory/
 server/embedding_model/__pycache__/
 *.pyc
 server/embedding_model/
+server/lora-dir/

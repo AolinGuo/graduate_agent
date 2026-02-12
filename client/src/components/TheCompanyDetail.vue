@@ -21,23 +21,49 @@
             <template #title>
               <div class="item-header">
                 <span class="time">{{ formatTime(item.time) }}</span>
-                <span class="issue-tag" v-if="item.issue1">
-                  <el-tag size="small" effect="plain">{{ item.issue1 }}</el-tag>
-                </span>
+                <div class="industry-tags">
+                  <el-tag v-if="item.industry1" size="mini" type="success" effect="plain">{{ item.industry1 }}</el-tag>
+                  <el-tag v-if="item.industry2" size="mini" type="warning" effect="plain">{{ item.industry2 }}</el-tag>
+                  <el-tag v-if="item.industry3" size="mini" type="info" effect="plain">{{ item.industry3 }}</el-tag>
+                </div>
               </div>
             </template>
             
             <div class="item-detail">
-              <div class="detail-row" v-if="item.issue2">
-                <span class="label">涉及问题(2):</span>
-                <span class="value">{{ item.issue2 }}</span>
+              <!-- 行业信息 -->
+              <div class="industry-info" v-if="item.industry1 || item.industry2 || item.industry3">
+                <div class="detail-row">
+                  <span class="label">行业分类:</span>
+                  <div class="industry-values">
+                    <el-tag v-if="item.industry1" size="small" type="success">{{ item.industry1 }}</el-tag>
+                    <el-tag v-if="item.industry2" size="small" type="warning">{{ item.industry2 }}</el-tag>
+                    <el-tag v-if="item.industry3" size="small" type="info">{{ item.industry3 }}</el-tag>
+                  </div>
+                </div>
               </div>
-              
+
+              <!-- 涉及问题 -->
+              <div class="issue-info" v-if="item.issue1 || item.issue2">
+                <div class="detail-row">
+                  <span class="label">涉及问题:</span>
+                  <div class="issue-values">
+                    <el-tag v-if="item.issue1" size="small" type="danger">{{ item.issue1 }}</el-tag>
+                    <el-tag v-if="item.issue2" size="small" type="danger" effect="light">{{ item.issue2 }}</el-tag>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 设计问题 -->
+              <div class="detail-row" v-if="item.design_issue1">
+                <span class="label">设计问题(1):</span>
+                <span class="value">{{ item.design_issue1 }}</span>
+              </div>
+
               <div class="detail-block">
                 <p class="label">问题描述:</p>
                 <div class="contentBox description">{{ item.desc }}</div>
               </div>
-              
+
               <div class="detail-block">
                 <p class="label">回复内容:</p>
                 <div class="contentBox reply">{{ item.reply }}</div>
@@ -214,10 +240,18 @@ onMounted(() => {
 
 .item-header {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
   padding-right: 10px;
+  align-items: flex-start;
+}
+
+.industry-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+  align-items: center;
 }
 
 .time {
@@ -225,9 +259,6 @@ onMounted(() => {
   color: #909399;
 }
 
-.issue-tag {
-  display: flex;
-}
 
 .item-detail {
   padding: 5px 10px;
@@ -240,6 +271,36 @@ onMounted(() => {
   margin-bottom: 8px;
   display: flex;
   gap: 8px;
+}
+
+.industry-info {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #67c23a;
+}
+
+.industry-values {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.issue-info {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #fff2f0;
+  border-radius: 4px;
+  border-left: 3px solid #f56c6c;
+}
+
+.issue-values {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
 }
 
 .label {
