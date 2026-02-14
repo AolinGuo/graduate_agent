@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 # 配置路径
 BASE_DIR = Path(__file__).parent
-RESULTS_DIR = BASE_DIR / "test_results"
+EVALUATION_DIR = BASE_DIR / "evaluation_results"
+EXTERNAL_EVAL_DIR = BASE_DIR / "external_evaluation"
+
+# 创建输出目录
+EXTERNAL_EVAL_DIR.mkdir(exist_ok=True)
 
 
 class ExternalModelEvaluator:
@@ -138,7 +142,7 @@ AI生成的回复：
         all_evaluations = {}
 
         for version in versions:
-            results_file = RESULTS_DIR / f"{version}_results.json"
+            results_file = EVALUATION_DIR / f"{version}_evaluation.json"
 
             if not results_file.exists():
                 logger.warning(f"{version} 结果文件不存在，跳过")
@@ -180,7 +184,7 @@ AI生成的回复：
                 logger.info(f"\n{version} 平均分: {avg_score:.2f}")
 
             # 保存评估结果
-            eval_output_path = RESULTS_DIR / f"{version}_external_evaluation.json"
+            eval_output_path = EXTERNAL_EVAL_DIR / f"{version}_external_evaluation.json"
             with open(eval_output_path, "w", encoding="utf-8") as f:
                 json.dump(evaluations, f, ensure_ascii=False, indent=2)
 

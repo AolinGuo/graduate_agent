@@ -6,5 +6,6 @@ sentence-transformers>=2.2.0
 scikit-learn>=1.0.0
 numpy>=1.21.0
 
-# 外部模型评估依赖（可选）
+# 外部API评估依赖（参考 server/data/new_train.py）
 openai>=1.0.0
+python-dotenv>=0.19.0

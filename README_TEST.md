@@ -54,22 +54,34 @@ python test_model.py
    - Embedding相似度 (语义相似度)
 5. 生成详细结果和汇总报告
 
-### 步骤2: 外部模型评估（可选）
+### 步骤2: 外部API评估（可选）
 
-如果需要使用外部模型（如GPT）进行质量评分:
+如果需要使用外部API（DeepSeek）进行质量评分:
+
+**准备工作：配置API密钥**
 
 ```bash
-# 方法1: 通过环境变量设置API密钥
-export OPENAI_API_KEY=your_api_key
-python test_with_external_model.py
+# 方法1: 创建 .env 文件（推荐）
+# 在项目根目录创建 .env 文件，添加:
+DEEPSEEK_API_KEY=your_deepseek_api_key
 
-# 方法2: 通过命令行参数
-python test_with_external_model.py your_api_key
+# 方法2: 设置环境变量
+# Windows:
+set DEEPSEEK_API_KEY=your_api_key
+
+# Linux/Mac:
+export DEEPSEEK_API_KEY=your_api_key
+```
+
+**运行API评估：**
+
+```bash
+python evaluate_with_external_api.py
 ```
 
 这个脚本会:
-1. 读取之前生成的测试结果
-2. 使用外部模型对每个生成的回复进行评分
+1. 读取步骤1生成的评估结果（包含生成的回复）
+2. 使用 DeepSeek API 对每个生成的回复进行专业评分
 3. 评估维度包括:
    - 准确性
    - 完整性
