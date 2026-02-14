@@ -11,6 +11,7 @@ declare module '@vue/runtime-core' {
   export interface GlobalComponents {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TheAgentChat: typeof import('./src/components/TheAgentChat.vue')['default']
     TheAggregatedVesselMovementView: typeof import('./src/components/TheAggregatedVesselMovementView.vue')['default']
     TheCommoditySelector: typeof import('./src/components/TheCommoditySelector.vue')['default']
     TheCompanyDetail: typeof import('./src/components/TheCompanyDetail.vue')['default']

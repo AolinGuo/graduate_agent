@@ -198,14 +198,17 @@
         </div>
       </div>
 
-      <!-- Column 4: Far Right (AI) -->
+      <!-- Column 4: Far Right (Agent + AI Reply) -->
       <div class="col-right-2">
          <div class="panel-item ai-wrapper">
             <el-tabs v-model="activeAITab" type="border-card" class="ai-tabs-compact">
-                <el-tab-pane label="AI报告" name="report">
-                    <div class="ai-content-scroll">
-                        <el-button size="small" type="primary" plain class="w-full mb-5" @click="handleGenerateAIReport" :loading="aiReportLoading">生成报告</el-button>
-                        <div v-if="aiReport" class="ai-text" v-html="formatReportText(aiReport)"></div>
+                <el-tab-pane label="Agent" name="agent">
+                    <div class="agent-tab-content">
+                        <TheAgentChat 
+                          :embedded="true" 
+                          :context="agentContext"
+                          @action="handleAgentAction" 
+                        />
                     </div>
                 </el-tab-pane>
                 <el-tab-pane label="AI回复" name="reply">
@@ -232,6 +235,7 @@ import TheSunburstCharts from '@/components/TheSunburstCharts.vue'
 import TheScatterChart from '@/components/TheScatterChart.vue'
 import TheCompanyRanking from '@/components/TheCompanyRanking.vue'
 import TheCompanyDetail from '@/components/TheCompanyDetail.vue'
+import TheAgentChat from '@/components/TheAgentChat.vue'
 
 import {
   getDashboardStats,
@@ -285,7 +289,7 @@ const trendData = ref([])
 const timeSeriesResults = ref(null)
 
 // AI
-const activeAITab = ref('report')
+const activeAITab = ref('agent')  // 默认显示Agent标签
 const aiReport = ref('')
 const aiReportLoading = ref(false)
 const aiReply = ref('')
@@ -554,6 +558,89 @@ const handleGenerateAIReply = async () => {
 }
 
 const formatReportText = (text) => text ? text.replace(/\n/g, '<br/>') : ''
+
+// Agent Context - 动态提供给Agent的上下文
+const agentContext = computed(() => ({
+  filters: {
+    startDate: filters.value.startDate,
+    endDate: filters.value.endDate,
+    selectedCompanies: filters.value.selectedCompanies,
+    selectedCategories: filters.value.selectedCategories,
+    selectedIndustries: filters.value.selectedIndustries
+  },
+  currentStats: {
+    total_complaints: dashboardStats.value.total_complaints || 0,
+    companies_count: dashboardStats.value.companies_count || 0,
+    industries_count: dashboardStats.value.industries_count || 0,
+    repeat_companies_count: dashboardStats.value.repeat_companies_count || 0,
+    company_ranking: dashboardStats.value.company_ranking?.slice(0, 10) || []
+  },
+  selectedCompany: selectedCompanyForDetail.value
+}))
+
+// Agent动作处理函数
+const handleAgentAction = async (action) => {
+  console.log('Handling agent action:', action)
+  
+  try {
+    switch (action.type) {
+      case 'update_stats':
+        await loadDashboardData()
+        ElMessage.success('已更新统计数据')
+        break
+      
+      case 'update_trend':
+        if (action.parameters?.period) {
+          trendPeriod.value = action.parameters.period
+        }
+        await loadTrendData()
+        ElMessage.success('已更新趋势图')
+        break
+      
+      case 'show_company':
+        if (action.parameters?.company_name) {
+          selectedCompanyForDetail.value = action.parameters.company_name
+          ElMessage.success(`已切换到${action.parameters.company_name}的详情`)
+        }
+        break
+      
+      case 'switch_chart_sunburst':
+        ElMessage.success('旭日图已在左侧显示')
+        break
+      
+      case 'switch_chart_quadrant':
+        ElMessage.success('散点图已在中间显示')
+        break
+      
+      case 'show_report':
+        ElMessage.success('报告已生成')
+        break
+      
+      case 'show_rag':
+        ElMessage.success('法律咨询结果已获取')
+        break
+      
+      case 'filter_data':
+        if (action.parameters) {
+          if (action.parameters.start_date) filters.value.startDate = action.parameters.start_date
+          if (action.parameters.end_date) filters.value.endDate = action.parameters.end_date
+          if (action.parameters.companies) filters.value.selectedCompanies = action.parameters.companies
+          if (action.parameters.industries) filters.value.selectedIndustries = action.parameters.industries
+          if (action.parameters.categories) filters.value.selectedCategories = action.parameters.categories
+          
+          await loadDashboardData()
+          ElMessage.success('已应用筛选条件')
+        }
+        break
+      
+      default:
+        console.warn('Unknown action type:', action.type)
+    }
+  } catch (error) {
+    console.error('Error handling agent action:', error)
+    ElMessage.error('执行动作时出错')
+  }
+}
 
 const filteredCompanyRanking = computed(() => {
     if (!dashboardStats.value.company_ranking) return []

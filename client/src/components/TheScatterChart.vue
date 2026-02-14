@@ -394,62 +394,9 @@ const renderChart = () => {
       .attr("fill", "#666")
   })
   
-  // 添加颜色深浅说明 - 色带
-  const gradientLegend = legend.append("g").attr("transform", `translate(0, ${legendItems.length * 18 + 5})`)
   
-  // 定义渐变
-  const gradientId = "opacity-gradient"
-  const defs = svg.append("defs")
-  const gradient = defs.append("linearGradient")
-    .attr("id", gradientId)
-    .attr("x1", "0%")
-    .attr("x2", "100%")
-  
-  gradient.append("stop")
-    .attr("offset", "0%")
-    .attr("stop-color", normalColor)
-    .attr("stop-opacity", 0.4)
-  
-  gradient.append("stop")
-    .attr("offset", "100%")
-    .attr("stop-color", normalColor)
-    .attr("stop-opacity", 1.0)
-  
-  // 标题
-  gradientLegend.append("text")
-    .attr("x", 0)
-    .attr("y", 0)
-    .text("数目多少")
-    .style("font-size", "10px")
-    .style("font-weight", "500")
-    .attr("fill", "#666")
-  
-  // 渐变色带
-  gradientLegend.append("rect")
-    .attr("x", 0)
-    .attr("y", 5)
-    .attr("width", 60)
-    .attr("height", 8)
-    .attr("fill", `url(#${gradientId})`)
-    .attr("stroke", "#ddd")
-    .attr("stroke-width", 0.5)
-  
-  // 左右标签
-  gradientLegend.append("text")
-    .attr("x", 0)
-    .attr("y", 22)
-    .text("少")
-    .style("font-size", "9px")
-    .attr("fill", "#999")
-  
-  gradientLegend.append("text")
-    .attr("x", 60)
-    .attr("y", 22)
-    .text("多")
-    .style("font-size", "9px")
-    .attr("fill", "#999")
-    .attr("text-anchor", "end")
 }
+
 
 // 暴露 chartRef 更新方法供父组件调用
 defineExpose({

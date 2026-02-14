@@ -1,0 +1,10 @@
+# 模型测试所需依赖
+
+# 基础测试依赖
+rouge-chinese>=1.0.3
+sentence-transformers>=2.2.0
+scikit-learn>=1.0.0
+numpy>=1.21.0
+
+# 外部模型评估依赖（可选）
+openai>=1.0.0

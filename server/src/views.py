@@ -987,6 +987,65 @@ def rag_query():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ============ 对话Agent接口 ============
+
+
+@app.route("/agent/chat", methods=["POST"])
+def agent_chat():
+    """对话Agent接口"""
+    try:
+        data = request.get_json()
+        message = data.get("message", "")
+        context = data.get("context", {})  # 当前上下文（筛选条件等）
+
+        if not message:
+            return jsonify({"success": False, "error": "消息不能为空"}), 400
+
+        # 获取Agent服务
+        from src.agent_service import get_agent_service
+
+        agent = get_agent_service()
+
+        # 处理用户消息
+        response = agent.process_message(message, context)
+
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Agent对话失败: {e}", exc_info=True)
+        return jsonify(
+            {
+                "success": False,
+                "error": str(e),
+                "message": "抱歉，处理您的请求时出现错误",
+            }
+        ), 500
+
+
+@app.route("/agent/tools", methods=["GET"])
+def get_agent_tools():
+    """获取Agent可用工具列表"""
+    try:
+        from src.agent_service import TOOLS
+
+        # 返回工具列表（简化版，不包含内部配置）
+        tools_info = []
+        for tool in TOOLS:
+            tools_info.append(
+                {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": list(tool["parameters"].keys()),
+                }
+            )
+
+        return jsonify({"success": True, "tools": tools_info, "total": len(tools_info)})
+
+    except Exception as e:
+        logger.error(f"获取工具列表失败: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============ 错误处理 ============
 
 
