@@ -1,0 +1,41 @@
+{
+  "evaluated_at": "2026-03-03T13:06:40.922015",
+  "api_config": {
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat"
+  },
+  "versions": {
+    "base": {
+      "overall_score": 80.06065318818041,
+      "accuracy": 7.3351477449455675,
+      "completeness": 8.12208398133748,
+      "professionalism": 8.594867807153966,
+      "attitude": 8.355365474339036,
+      "legal_basis": 7.622861586314152
+    },
+    "base_rag": {
+      "overall_score": 79.99844479004666,
+      "accuracy": 7.367807153965785,
+      "completeness": 8.115085536547435,
+      "professionalism": 8.639191290824261,
+      "attitude": 8.482115085536547,
+      "legal_basis": 7.3950233281493
+    },
+    "lora": {
+      "overall_score": 64.64385692068429,
+      "accuracy": 6.061430793157077,
+      "completeness": 5.217729393468118,
+      "professionalism": 7.210730948678072,
+      "attitude": 8.038880248833593,
+      "legal_basis": 5.793157076205287
+    },
+    "lora_rag": {
+      "overall_score": 70.72939346811819,
+      "accuracy": 6.5326594090202175,
+      "completeness": 5.720062208398134,
+      "professionalism": 7.853810264385692,
+      "attitude": 8.241057542768274,
+      "legal_basis": 7.01710730948678
+    }
+  }
+}

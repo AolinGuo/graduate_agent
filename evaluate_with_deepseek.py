@@ -256,11 +256,9 @@ class ExternalAPIEvaluator:
         api_evaluations = []
 
         for idx, item in enumerate(results, 1):
-            logger.info(f"API评分 {idx}/{len(results)}", end="", flush=True)
-
             instruction = item["instruction"]
-            reference = item["reference"]
-            generated = item["generated"]
+            reference = item["reference_output"]
+            generated = item["generated_output"]
 
             # 调用API评估
             api_eval = self.evaluate_single_response(instruction, reference, generated)
