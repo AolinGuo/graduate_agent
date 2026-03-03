@@ -1,11 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-步骤1: 生成模型回复
-使用四个版本的模型生成回复并保存
-版本：base、base+RAG、lora、lora+RAG
-"""
-
+# 生成回复
 import json
 import os
 import sys
@@ -44,16 +37,11 @@ class ResponseGenerator:
 
     def load_test_data(self):
         """加载测试数据"""
-        logger.info(f"加载测试数据: {TEST_DATA_PATH}")
-
         if not TEST_DATA_PATH.exists():
             logger.error(f"测试数据文件不存在: {TEST_DATA_PATH}")
-            logger.info("请确保 server/data/query_test.json 文件存在")
             return False
-
         with open(TEST_DATA_PATH, "r", encoding="utf-8") as f:
             self.test_data = json.load(f)
-
         logger.info(f"测试数据加载完成，共 {len(self.test_data)} 条")
         return True
 
@@ -67,9 +55,7 @@ class ResponseGenerator:
         Returns:
             是否加载成功
         """
-        logger.info(f"\n{'=' * 60}")
         logger.info(f"加载 {model_type} 模型")
-        logger.info(f"{'=' * 60}")
 
         try:
             # 先清理之前的模型
@@ -137,7 +123,7 @@ class ResponseGenerator:
         self,
         instruction: str,
         input_text: str = "",
-        system: str = "你是一个专业的法律投诉处理助手。",
+        system: str = "",
         max_new_tokens: int = 2048,
         temperature: float = 0.7,
         top_p: float = 0.9,
@@ -157,13 +143,12 @@ class ResponseGenerator:
             生成的回复
         """
         try:
-            # 构建消息
+            # 构造用户侧的内容
             if input_text:
-                # 带RAG的情况
-                user_content = f"{instruction}\n\n参考材料：\n{input_text}"
+                # 针对法律场景，明确区分投诉内容和法律条文
+                user_content = f"【投诉内容】：\n{instruction}\n\n【参考法律条文】：\n{input_text}"
             else:
-                # 不带RAG的情况
-                user_content = instruction
+                user_content = f"【投诉内容】：\n{instruction}"
 
             messages = [
                 {"role": "system", "content": system},
@@ -258,34 +243,38 @@ class ResponseGenerator:
 
         for idx, item in enumerate(self.test_data, 1):
             logger.info(f"\n进度: {idx}/{total}")
-            logger.info(f"问题: {item['instruction'][:50]}...")
+            
+            # 1. 提取数据
+            instruction = item.get("instruction", "")
+            reference = item.get("output", "")  # 你的数据集中 output 是参考答案
+            
+            # 2. 获取 System Prompt (优先使用数据集中的，其次用类默认的)
+            system_prompt = item.get("system", "你是一个专业的法律投诉处理助手。")
 
-            instruction = item["instruction"]
-            reference = item["output"]
-            system = item.get("system", "你是一个专业的法律投诉处理助手。")
-
-            # 根据是否使用RAG决定是否传入参考材料
+            # 3. 处理 RAG 逻辑
+            # 根据 version 决定是否将数据集中的 input 作为上下文传入
             if use_rag:
                 input_text = item.get("input", "")
             else:
                 input_text = ""
 
-            # 生成回复
+            # 4. 调用生成逻辑
             generated = self.generate_single_response(
-                instruction=instruction, input_text=input_text, system=system
+                instruction=instruction, 
+                input_text=input_text, 
+                system=system_prompt
             )
 
-            # 保存结果
+            # 5. 保存结果（映射回你的字段名，方便后续对比）
             result = {
                 "index": idx - 1,
                 "instruction": instruction,
-                "reference": reference,
-                "generated": generated,
-                "system": system,
-                "input": input_text if use_rag else "",
+                "reference_output": reference,
+                "generated_output": generated,
+                "system": system_prompt,
+                "rag_input": input_text if use_rag else "N/A",
                 "use_rag": use_rag,
             }
-
             results.append(result)
 
             logger.info(f"生成的回复: {generated[:100]}...")

@@ -17,3 +17,4 @@ server/embedding_model/__pycache__/
 *.pyc
 server/embedding_model/
 server/lora-dir/
+testenv/

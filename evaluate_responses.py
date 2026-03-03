@@ -173,8 +173,8 @@ class ResponseEvaluator:
         for idx, item in enumerate(results, 1):
             logger.info(f"评估样本 {idx}/{len(results)}")
 
-            generated = item["generated"]
-            reference = item["reference"]
+            generated = item["generated_output"]  # 修改这里
+            reference = item["reference_output"]  # 修改这里
 
             # 计算ROUGE分数
             rouge_scores = self.calculate_rouge(generated, reference)

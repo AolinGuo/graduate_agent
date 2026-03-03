@@ -13,23 +13,6 @@ pip install scikit-learn
 pip install openai  # 如果需要使用外部模型评估
 ```
 
-### 2. 模型准备
-
-由于模型文件不在本地，您需要先下载或准备好以下模型：
-
-- **Base模型**: 存放在 `server/model-dir/`
-- **LoRA模型**: 存放在 `server/lora-dir/`
-- **Embedding模型**: 存放在 `server/embedding_model/`
-
-如果模型在远程服务器或HuggingFace上，请根据 `server/src/ai_service_vllm.py` 中的配置进行调整。
-
-### 3. 测试数据
-
-测试数据应该已经存在于:
-- `server/data/query_test.json`
-
-训练数据格式参考:
-- `server/data/query_train.json`
 
 ## 测试流程
 
