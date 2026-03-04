@@ -167,7 +167,7 @@ async function handleSendMessage() {
   isLoading.value = true
 
   try {
-    const response = await fetch('http://localhost:5000/agent/chat', {
+    const response = await fetch('/api/agent/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userMessage, context: props.context || {} })
