@@ -11,13 +11,14 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# vLLM配置
+# vLLM配置（支持通过环境变量覆盖）
 VLLM_CONFIG = {
     "model": {
-        "tensor_parallel_size": 1,  # 单GPU
-        "dtype": "bfloat16",  # 或 "float16"
-        "max_model_len": 4096,  # 最大序列长度
-        "gpu_memory_utilization": 0.9,  # GPU显存利用率
+        # tensor_parallel_size: 使用GPU数量，单卡设为1，多卡改为对应数量
+        "tensor_parallel_size": int(os.getenv("TENSOR_PARALLEL_SIZE", "1")),
+        "dtype": os.getenv("MODEL_DTYPE", "bfloat16"),
+        "max_model_len": int(os.getenv("MAX_MODEL_LEN", "4096")),
+        "gpu_memory_utilization": float(os.getenv("GPU_MEM_UTIL", "0.9")),
         "trust_remote_code": True,
     },
     "sampling": {
@@ -30,8 +31,8 @@ VLLM_CONFIG = {
         "reply_max_tokens": 512,
     },
     "streaming": {
-        "enabled": True,  # 启用流式输出
-        "chunk_size": 10,  # 每次返回的token数
+        "enabled": True,
+        "chunk_size": 10,
     },
 }
 
@@ -39,24 +40,41 @@ VLLM_CONFIG = {
 class VLLMAIService:
     """基于vLLM的AI服务类 - 高性能推理"""
 
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str = None, adapter_path: str = None):
         """
         初始化vLLM AI服务
 
         Args:
-            model_path: 模型路径，默认使用 server/model-dir
+            model_path: 基础模型路径，优先级：参数 > 环境变量 MODEL_PATH > server/model-dir
+            adapter_path: LoRA 权重路径（vLLM 原生支持），优先级：参数 > 环境变量 LORA_PATH
         """
         self.llm = None
         self.tokenizer = None
         self.model_loaded = False
 
-        # 设置模型路径
+        # 设置基础模型路径：参数 > 环境变量 > 默认相对路径
         if model_path is None:
-            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            model_path = os.path.join(current_dir, "model-dir")
+            env_path = os.getenv("MODEL_PATH")
+            if env_path:
+                model_path = env_path
+            else:
+                current_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
+                model_path = os.path.join(current_dir, "model-dir")
 
         self.model_path = model_path
+
+        # 设置 LoRA 路径：参数 > 环境变量 > None
+        if adapter_path is None:
+            adapter_path = os.getenv("LORA_PATH") or None
+        self.adapter_path = adapter_path
+
+        # 记录当前 GPU 配置
+        gpu_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "(未设置，使用全部GPU)")
         logger.info(f"vLLM AI服务初始化 - 模型路径: {self.model_path}")
+        logger.info(f"vLLM AI服务初始化 - LoRA路径: {self.adapter_path}")
+        logger.info(f"vLLM AI服务初始化 - CUDA_VISIBLE_DEVICES: {gpu_visible}")
 
     def load_model(self):
         """加载vLLM模型"""
@@ -66,15 +84,17 @@ class VLLMAIService:
 
         try:
             logger.info(f"正在使用vLLM加载模型: {self.model_path}")
+            if self.adapter_path:
+                logger.info(f"同时加载 LoRA 权重: {self.adapter_path}")
 
-            from vllm import LLM, SamplingParams
+            from vllm import LLM
             from transformers import AutoTokenizer
 
             # 获取配置
             model_config = VLLM_CONFIG["model"]
 
-            # 初始化vLLM引擎
-            self.llm = LLM(
+            # 构建 LLM 初始化参数
+            llm_kwargs = dict(
                 model=self.model_path,
                 tensor_parallel_size=model_config["tensor_parallel_size"],
                 dtype=model_config["dtype"],
@@ -82,6 +102,13 @@ class VLLMAIService:
                 gpu_memory_utilization=model_config["gpu_memory_utilization"],
                 trust_remote_code=model_config["trust_remote_code"],
             )
+
+            # 如果指定了 LoRA 权重，通过 enable_lora 启用
+            if self.adapter_path:
+                llm_kwargs["enable_lora"] = True
+
+            # 初始化vLLM引擎
+            self.llm = LLM(**llm_kwargs)
 
             # 加载tokenizer用于构建提示词
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -108,6 +135,7 @@ class VLLMAIService:
         system_prompt: str = "You are a helpful assistant.",
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        max_new_tokens: int = None,  # 兼容 ai_service.py 的调用参数名
         top_p: float = 0.9,
         stream: bool = False,
     ):
@@ -118,7 +146,8 @@ class VLLMAIService:
             user_input: 用户输入内容
             system_prompt: 系统提示词
             temperature: 采样温度
-            max_tokens: 最大生成token数
+            max_tokens: 最大生成token数（vLLM原生参数名）
+            max_new_tokens: 兼容 transformers 风格的参数名，与 max_tokens 二选一
             top_p: nucleus采样参数
             stream: 是否启用流式输出
 
@@ -127,6 +156,10 @@ class VLLMAIService:
         """
         if not self.model_loaded:
             self.load_model()
+
+        # 兼容 max_new_tokens 参数名
+        if max_new_tokens is not None:
+            max_tokens = max_new_tokens
 
         try:
             from vllm import SamplingParams
@@ -147,7 +180,6 @@ class VLLMAIService:
                 temperature=temperature,
                 top_p=top_p,
                 max_tokens=max_tokens,
-                stop=None,  # 使用模型默认的停止词
             )
 
             logger.info(f"正在生成AI回复... (stream={stream})")
@@ -184,14 +216,14 @@ class VLLMAIService:
         # vLLM的流式生成使用异步方式
         # 这里我们使用批处理模拟流式输出
         full_text = ""
-        
+
         try:
             outputs = self.llm.generate([prompt], sampling_params)
             response = outputs[0].outputs[0].text
 
             # 解析完整响应
             parsed = self._parse_response(response)
-            
+
             # 如果有thinking，先返回
             if parsed["thinking"]:
                 yield {
@@ -203,7 +235,7 @@ class VLLMAIService:
             # 分块返回回复内容
             reply = parsed["reply"]
             chunk_size = VLLM_CONFIG["streaming"]["chunk_size"]
-            
+
             for i in range(0, len(reply), chunk_size):
                 chunk = reply[i : i + chunk_size]
                 full_text += chunk
@@ -229,9 +261,7 @@ class VLLMAIService:
                 "done": True,
             }
 
-    def generate_report(
-        self, report_data: Dict[str, Any], stream: bool = False
-    ):
+    def generate_report(self, report_data: Dict[str, Any], stream: bool = False):
         """
         生成投诉分析报告
 
@@ -283,9 +313,7 @@ class VLLMAIService:
             stream=stream,
         )
 
-    def generate_reply_suggestion(
-        self, complaint_content: str, stream: bool = False
-    ):
+    def generate_reply_suggestion(self, complaint_content: str, stream: bool = False):
         """
         生成投诉回复建议
 
@@ -363,12 +391,15 @@ class VLLMAIService:
 _vllm_ai_service_instance: Optional[VLLMAIService] = None
 
 
-def get_vllm_ai_service(model_path: str = None) -> VLLMAIService:
+def get_vllm_ai_service(
+    model_path: str = None, adapter_path: str = None
+) -> VLLMAIService:
     """
     获取vLLM AI服务实例（单例模式）
 
     Args:
-        model_path: 模型路径（首次调用时设置）
+        model_path: 模型路径，为 None 时从环境变量 MODEL_PATH 读取
+        adapter_path: LoRA 权重路径，为 None 时从环境变量 LORA_PATH 读取
 
     Returns:
         VLLMAIService: vLLM AI服务实例
@@ -376,6 +407,8 @@ def get_vllm_ai_service(model_path: str = None) -> VLLMAIService:
     global _vllm_ai_service_instance
 
     if _vllm_ai_service_instance is None:
-        _vllm_ai_service_instance = VLLMAIService(model_path=model_path)
+        _vllm_ai_service_instance = VLLMAIService(
+            model_path=model_path, adapter_path=adapter_path
+        )
 
     return _vllm_ai_service_instance

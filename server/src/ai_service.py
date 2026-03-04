@@ -45,13 +45,11 @@ AI_CONFIG = {
 # 设置CUDA设备（如果需要指定特定GPU）
 gpu_config = AI_CONFIG["gpu"]
 if gpu_config["use_single_gpu"]:
-    # 根据nvidia-smi结果，选择显存最空闲的物理GPU
-    # GPU 2 和 GPU 5 可用（RTX 4090）
-    physical_gpu = "2"  # GPU 2 是RTX 4090（可改为"5"）
-    os.environ["CUDA_VISIBLE_DEVICES"] = physical_gpu
+    # 物理GPU已在 run.py 等外部脚本统一设置
+    physical_gpu = os.environ.get("CUDA_VISIBLE_DEVICES", "2")
     if AI_CONFIG["logging"]["verbose"]:
         logging.getLogger(__name__).info(
-            f"设置使用物理GPU {physical_gpu}"
+            f"当前使用的物理GPU (统一分配): {physical_gpu}"
         )
 
 logger = logging.getLogger(__name__)

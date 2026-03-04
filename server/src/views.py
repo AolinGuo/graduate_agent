@@ -941,10 +941,10 @@ def rag_query():
                 }
             )
 
-        # 使用AI生成回答
-        from src.ai_service_unified import get_unified_ai_service
+        # 使用vLLM AI生成回答
+        from src.ai_service_vllm import get_vllm_ai_service
 
-        ai_service = get_unified_ai_service()
+        ai_service = get_vllm_ai_service()
 
         # 构建上下文
         context = "\n\n".join(

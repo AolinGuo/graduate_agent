@@ -10,6 +10,12 @@ import sys
 import logging
 from pathlib import Path
 
+# ---------- 统一管理后台 GPU 分配 ----------
+# 可通过环境变量 GPU_ID 进行覆盖
+gpu_id = os.getenv("GPU_ID", "2")
+os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+# ----------------------------------------
+
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
@@ -26,6 +32,18 @@ def main():
     print("=" * 60)
     print("🚀 工商投诉数据分析系统 - 后端服务启动")
     print("=" * 60)
+    print(
+        f"📌 GPU编号 (CUDA_VISIBLE_DEVICES): {os.environ.get('CUDA_VISIBLE_DEVICES', '(未设置)')}"
+    )
+    print(
+        f"📌 基座模型路径 (MODEL_PATH):    {os.environ.get('MODEL_PATH', 'server/model-dir (默认)')}"
+    )
+    print(
+        f"📌 LoRA权重路径  (LORA_PATH):     {os.environ.get('LORA_PATH', '(未设置)')}"
+    )
+    print(
+        f"📌 Embedding路径 (EMBEDDING_MODEL_PATH): {os.environ.get('EMBEDDING_MODEL_PATH', 'server/embedding_model (默认)')}"
+    )
 
     try:
         # 导入Flask应用
