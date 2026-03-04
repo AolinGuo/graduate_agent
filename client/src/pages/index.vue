@@ -203,13 +203,11 @@
          <div class="panel-item ai-wrapper">
             <el-tabs v-model="activeAITab" type="border-card" class="ai-tabs-compact">
                 <el-tab-pane label="Agent" name="agent">
-                    <div class="agent-tab-content">
-                        <TheAgentChat 
-                          :embedded="true" 
-                          :context="agentContext"
-                          @action="handleAgentAction" 
-                        />
-                    </div>
+                    <TheAgentChat 
+                      :embedded="true" 
+                      :context="agentContext"
+                      @action="handleAgentAction" 
+                    />
                 </el-tab-pane>
                 <el-tab-pane label="AI回复" name="reply">
                     <div class="ai-content-scroll">
@@ -798,6 +796,8 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding: 0;
 }
 
 /* Controls */
@@ -834,13 +834,29 @@ onMounted(() => {
     height: 100%;
     border: none;
     box-shadow: none;
+    display: flex;
+    flex-direction: column;
 }
 .ai-tabs-compact :deep(.el-tabs__header) {
     margin-bottom: 0;
+    flex-shrink: 0;
 }
 .ai-tabs-compact :deep(.el-tabs__content) {
     flex: 1;
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+.ai-tabs-compact :deep(.el-tab-pane) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.ai-content-scroll {
+    flex: 1;
     overflow-y: auto;
-    padding: 10px;
+    padding: 12px;
 }
 </style>
