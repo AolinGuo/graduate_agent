@@ -68,7 +68,7 @@ def find_max_length(file_path, target_key=None):
     print("-" * 30)
     
     if max_item:
-        print(f"【最长数据统计】")
+        print("【最长数据统计】")
         print(f"最大长度 (字符数): {max_len}")
         print(f"所在位置 (行号/索引): 第 {max_index + 1} 条") # +1 符合人类阅读习惯
         

@@ -7,9 +7,7 @@
 """
 
 import json
-import os
-import sys
-from typing import List, Dict, Any
+from typing import Dict
 import logging
 from pathlib import Path
 import numpy as np
@@ -158,7 +156,7 @@ class ResponseEvaluator:
 
         if not generated_path.exists():
             logger.error(f"生成文件不存在: {generated_path}")
-            logger.info(f"请先运行 generate_responses.py 生成回复")
+            logger.info("请先运行 generate_responses.py 生成回复")
             return None
 
         with open(generated_path, "r", encoding="utf-8") as f:

@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-from typing import List, Dict
 
 # ================= 配置区域 =================
 
@@ -36,7 +35,7 @@ class DataCleaningJob:
         self.model_path = model_path
         
         # 打印当前使用的设备配置
-        logger.info(f"正在初始化多卡清洗任务...")
+        logger.info("正在初始化多卡清洗任务...")
         logger.info(f"使用显卡 (CUDA_VISIBLE_DEVICES): {os.environ.get('CUDA_VISIBLE_DEVICES')}")
         logger.info(f"并行度 (Tensor Parallel): {TENSOR_PARALLEL_SIZE}")
         

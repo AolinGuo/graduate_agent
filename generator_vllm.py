@@ -1,10 +1,8 @@
 # 使用vllm生成回复
 import json
-import os
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
 from vllm import LLM, SamplingParams
 from vllm.lora.request import LoRARequest
 

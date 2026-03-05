@@ -20,7 +20,7 @@ def split_json_dataset(input_path, train_output_path, test_output_path, test_rat
             else:
                 # 正常的 json 读取
                 data = json.load(f)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
 
         return
     # --- 修改结束 ---

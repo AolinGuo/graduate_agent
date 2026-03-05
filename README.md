@@ -1,10 +1,4 @@
 
-# va-framework
-组里服务器代理
-```bash
-source /etc/profile.d/clash.sh
-proxy_on
-```
 ## Begin
 ```bash
 cd server
@@ -18,7 +12,7 @@ pnpm i
 pnpm run dev
 ```
 
-模型微调
+模型微调虚拟环境
 ```bash
 cd LlamaFactory
 source myven/bin/activate
