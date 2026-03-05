@@ -305,9 +305,30 @@ watch([
   updateSunburstCharts()
 }, { deep: true })
 
-// 暴露更新方法给父组件调用
+// 从旭日图树形数据中提取 top-N 分类（仅取 depth=1 的子项）
+function extractTopCategories(treeData, topN = 3) {
+  if (!treeData || !treeData.children) return []
+  const total = treeData.children.reduce((s, c) => s + (c.value || 0), 0)
+  return treeData.children
+    .slice()
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .slice(0, topN)
+    .map(c => ({
+      name: c.name,
+      count: c.value || 0,
+      percent: total > 0 ? +((c.value / total) * 100).toFixed(1) : 0
+    }))
+}
+
+// 暴露更新方法和数据摘要给父组件调用
 defineExpose({
-  updateSunburstCharts
+  updateSunburstCharts,
+  getSummary() {
+    return {
+      category_top3: extractTopCategories(categorySunburstData.value, 3),
+      issue_top3: extractTopCategories(issueSunburstData.value, 3)
+    }
+  }
 })
 
 // 组件挂载时初始化

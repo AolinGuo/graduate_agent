@@ -557,6 +557,38 @@ const handleGenerateAIReply = async () => {
 
 const formatReportText = (text) => text ? text.replace(/\n/g, '<br/>') : ''
 
+// 趋势数据智能压缩：≤20个点全传；>20个点改传按周和按月聚合的统计
+function computeTrendSummary(rawData) {
+  if (!rawData || rawData.length === 0) return { mode: 'empty', data: [] }
+  if (rawData.length <= 20) {
+    return { mode: 'daily', data: rawData.map(d => ({ time: d.time, count: d.count })) }
+  }
+  // 按周聚合
+  const weeklyMap = {}
+  rawData.forEach(d => {
+    const date = new Date(d.time)
+    if (isNaN(date)) return
+    const year = date.getFullYear()
+    const startOfYear = new Date(year, 0, 1)
+    const week = Math.ceil(((date - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7)
+    const key = `${year}-W${String(week).padStart(2, '0')}`
+    weeklyMap[key] = (weeklyMap[key] || 0) + (d.count || 0)
+  })
+  // 按月聚合
+  const monthlyMap = {}
+  rawData.forEach(d => {
+    const date = new Date(d.time)
+    if (isNaN(date)) return
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    monthlyMap[key] = (monthlyMap[key] || 0) + (d.count || 0)
+  })
+  return {
+    mode: 'aggregated',
+    weekly: Object.entries(weeklyMap).sort().map(([time, count]) => ({ time, count })),
+    monthly: Object.entries(monthlyMap).sort().map(([time, count]) => ({ time, count }))
+  }
+}
+
 // Agent Context - 动态提供给Agent的上下文
 const agentContext = computed(() => ({
   filters: {
@@ -573,7 +605,14 @@ const agentContext = computed(() => ({
     repeat_companies_count: dashboardStats.value.repeat_companies_count || 0,
     company_ranking: dashboardStats.value.company_ranking?.slice(0, 10) || []
   },
-  selectedCompany: selectedCompanyForDetail.value
+  selectedCompany: selectedCompanyForDetail.value,
+  // 趋势图数据（智能压缩：≤20点全传，>20点传周/月聚合）
+  trendData: computeTrendSummary(trendData.value),
+  trendPeriod: trendPeriod.value,
+  // 旭日图摘要：top-3 问题分类和涉及问题
+  sunburstSummary: sunburstChartsRef.value?.getSummary?.() ?? null,
+  // 散点图摘要：top-10 企业（含投诉量、问题多样性、预警状态）
+  scatterSummary: scatterChartRef.value?.getSummary?.() ?? null,
 }))
 
 // Agent动作处理函数

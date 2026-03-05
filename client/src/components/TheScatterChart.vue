@@ -398,9 +398,23 @@ const renderChart = () => {
 }
 
 
-// 暴露 chartRef 更新方法供父组件调用
+// 暴露更新方法和数据摘要给父组件调用
 defineExpose({
-  updateChart: loadData
+  updateChart: loadData,
+  getSummary() {
+    if (!data.value || data.value.length === 0) return null
+    const sorted = data.value.slice().sort((a, b) => (b.count || 0) - (a.count || 0))
+    return {
+      total_companies: data.value.length,
+      warning_companies: data.value.filter(d => d.min_interval < 30).length,
+      top10_companies: sorted.slice(0, 10).map(d => ({
+        name: d.name,
+        count: d.count,
+        diversity: d.diversity,
+        is_warning: d.min_interval < 30
+      }))
+    }
+  }
 })
 
 // 使用computed生成监听key，避免deep watch导致的性能问题

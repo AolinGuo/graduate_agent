@@ -4,6 +4,24 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# RAG 服务懒加载单例（避免在模块导入时就初始化占用资源）
+_rag_service_instance = None
+
+
+def _get_rag_service():
+    """懒加载并返回 LegalRAGService 单例"""
+    global _rag_service_instance
+    if _rag_service_instance is None:
+        try:
+            from .rag_service import LegalRAGService
+
+            _rag_service_instance = LegalRAGService()
+            logger.info("LegalRAGService 初始化成功")
+        except Exception as e:
+            logger.warning(f"LegalRAGService 初始化失败，将跳过 RAG 检索: {e}")
+    return _rag_service_instance
+
+
 # vLLM配置（支持通过环境变量覆盖）
 VLLM_CONFIG = {
     "model": {
@@ -310,6 +328,9 @@ class VLLMAIService:
         """
         生成投诉回复建议
 
+        在生成回复之前，先通过 RAG 服务检索与投诉内容最相关的法律条文，
+        并将其作为参考资料注入到系统提示词中，使模型能够引用具体法律依据。
+
         Args:
             complaint_content: 市民投诉内容
             stream: 是否启用流式输出
@@ -317,22 +338,51 @@ class VLLMAIService:
         Returns:
             dict or Generator: AI生成的回复建议
         """
-        system_prompt = """你是一位经验丰富的市场监管局工作人员，负责处理市民投诉。
-请根据市民的投诉内容，生成一份专业、得体、有效的官方回复。
-回复应该：
-1. 表明已收到并重视投诉
-2. 说明处理措施或调查情况
-3. 给出解决方案或处理结果
-4. 语气专业、态度诚恳
-5. 长度适中（100-200字）"""
+        # ── 1. RAG 检索相关法律条文 ──────────────────────────────────────
+        legal_context = ""
+        try:
+            rag = _get_rag_service()
+            if rag is not None:
+                logger.info("正在通过 RAG 检索相关法律条文...")
+                results = rag.search(complaint_content, top_k=3)
+                if results:
+                    legal_lines = []
+                    for idx, item in enumerate(results, start=1):
+                        source = item.get("source", "未知来源")
+                        article_id = item.get("id", "")
+                        content = item.get("content", "").strip()
+                        legal_lines.append(
+                            f"【法条{idx}】《{source}》{article_id}\n{content}"
+                        )
+                    legal_context = "\n\n".join(legal_lines)
+                    logger.info(f"RAG 检索到 {len(results)} 条相关法律条文")
+                else:
+                    logger.info("RAG 未检索到相关法律条文")
+        except Exception as e:
+            logger.warning(f"RAG 检索出错，将跳过法律召回: {e}")
 
+        # ── 2. 构建系统提示词（含法律参考）──────────────────────────────
+        base_prompt = """
+你是一个专业的法律投诉处理助手。请根据用户的投诉内容和提供的法律条文，以第一人称（我/我们）的口吻，生成回复。回复需涵盖事件处理结果，并有理有据地引用法律条文解释原因，态度礼貌且专业。"
+"""
+
+        if legal_context:
+            system_prompt = (
+                base_prompt
+                + "\n\n以下是与本次投诉相关的法律法规，请在回复中适当引用，使回复具有法律依据：\n\n"
+                + legal_context
+            )
+        else:
+            system_prompt = base_prompt
+
+        # ── 3. 构建用户输入 ───────────────────────────────────────────────
         user_input = f"""市民投诉内容如下：
 
 {complaint_content}
 
 请生成一份专业的官方回复建议。"""
 
-        # 使用配置的参数
+        # ── 4. 调用模型生成回复 ───────────────────────────────────────────
         sampling_config = VLLM_CONFIG["sampling"]
         return self.generate_response(
             user_input=user_input,

@@ -201,8 +201,8 @@ class AgentService:
             parts.append(f"- 预警企业：{stats.get('repeat_companies_count', 0)} 家")
             ranking = stats.get("company_ranking", [])
             if ranking:
-                parts.append("**投诉最多企业（前5名）**：")
-                for idx, company in enumerate(ranking[:5], 1):
+                parts.append("**投诉最多企业（前10名）**：")
+                for idx, company in enumerate(ranking[:10], 1):
                     parts.append(
                         f"  {idx}. {company.get('name', '未知')}：{company.get('count', 0)} 条"
                     )
@@ -221,6 +221,53 @@ class AgentService:
             if filters.get("selectedIndustries"):
                 industries_str = "、".join(filters["selectedIndustries"][:3])
                 parts.append(f"**已筛选行业**：{industries_str}")
+
+        # 趋势数据摘要
+        trend = context.get("trendData", {})
+        trend_mode = trend.get("mode", "empty")
+        if trend_mode == "daily" and trend.get("data"):
+            counts = [d["count"] for d in trend["data"] if "count" in d]
+            if counts:
+                parts.append(
+                    f"**投诉趋势（按{context.get('trendPeriod', '天')}，共{len(counts)}个点）**："
+                    f"最高 {max(counts)} 条，最低 {min(counts)} 条，均值 {sum(counts) / len(counts):.1f} 条"
+                )
+        elif trend_mode == "aggregated":
+            monthly = trend.get("monthly", [])
+            if monthly:
+                counts = [d["count"] for d in monthly]
+                parts.append(
+                    f"**投诉趋势（按月聚合，共{len(monthly)}个月）**："
+                    f"最高 {max(counts)} 条，最低 {min(counts)} 条"
+                )
+
+        # 旭日图摘要（问题分类 top-3）
+        sunburst = context.get("sunburstSummary")
+        if sunburst:
+            cat3 = sunburst.get("category_top3", [])
+            if cat3:
+                cat_str = "、".join(f"{c['name']}({c['percent']}%)" for c in cat3)
+                parts.append(f"**投诉问题分类 Top3**：{cat_str}")
+            issue3 = sunburst.get("issue_top3", [])
+            if issue3:
+                issue_str = "、".join(f"{c['name']}({c['percent']}%)" for c in issue3)
+                parts.append(f"**涉及问题类型 Top3**：{issue_str}")
+
+        # 散点图摘要（高风险企业）
+        scatter = context.get("scatterSummary")
+        if scatter:
+            parts.append(
+                f"**企业风险分布**：共 {scatter.get('total_companies', 0)} 家，"
+                f"预警企业 {scatter.get('warning_companies', 0)} 家"
+            )
+            top10 = scatter.get("top10_companies", [])
+            if top10:
+                parts.append("**散点图 Top10 企业（投诉量）**：")
+                for idx, c in enumerate(top10, 1):
+                    warn = "⚠️" if c.get("is_warning") else ""
+                    parts.append(
+                        f"  {idx}. {c['name']}{warn}：投诉 {c['count']} 条，问题类型 {c['diversity']} 种"
+                    )
 
         return "\n" + "\n".join(parts) if parts else ""
 
@@ -523,17 +570,18 @@ class AgentService:
     def _tool_generate_report(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
         工具4：生成投诉分析报告
-        优先使用前端 context 中的统计数据，避免重复调用 API
+        优先使用前端 context 中的统计数据（含图表摘要），避免重复调用 API
         """
         from src.ai_service_vllm import get_vllm_ai_service
 
         stats = None
         use_context = False
         time_range_str = f"{parameters.get('start_date', '开始')} 至 {parameters.get('end_date', '结束')}"
+        context = self._last_context or {}
 
         # 优先从 context 获取统计数据
-        if self._last_context:
-            context_stats = self._last_context.get("currentStats", {})
+        if context:
+            context_stats = context.get("currentStats", {})
             if context_stats.get("total_complaints", 0) > 0:
                 stats = {
                     "total_complaints": context_stats.get("total_complaints", 0),
@@ -545,12 +593,9 @@ class AgentService:
                     "company_ranking": context_stats.get("company_ranking", []),
                 }
                 use_context = True
-
-                # 时间范围优先用 context filters
-                filters = self._last_context.get("filters", {})
+                filters = context.get("filters", {})
                 if filters.get("startDate"):
                     time_range_str = f"{filters.get('startDate')} 至 {filters.get('endDate', '结束')}"
-
                 logger.info(
                     "generate_report: 使用 context 统计数据（避免重复 API 调用）"
                 )
@@ -566,11 +611,79 @@ class AgentService:
             )
             logger.info("generate_report: 从后端 API 获取统计数据")
 
-        # 构建报告数据
+        # ── 构建 top-10 企业文本 ───────────────────────────────────────
         top_companies_lines = []
         for idx, company in enumerate(stats.get("company_ranking", [])[:10], 1):
             top_companies_lines.append(
                 f"{idx}. {company.get('name', '未知')}（{company.get('count', 0)} 条）"
+            )
+
+        # ── 构建趋势摘要文本 ──────────────────────────────────────────
+        trend = context.get("trendData", {})
+        trend_mode = trend.get("mode", "empty")
+        trend_summary = f"总投诉量为 {stats.get('total_complaints', 0)} 条"
+        if trend_mode == "daily" and trend.get("data"):
+            counts = [d["count"] for d in trend["data"] if "count" in d]
+            if counts:
+                trend_summary = (
+                    f"总投诉量 {stats.get('total_complaints', 0)} 条；"
+                    f"按{context.get('trendPeriod', '天')}统计共 {len(counts)} 个时间点，"
+                    f"峰值 {max(counts)} 条，谷值 {min(counts)} 条，均值 {sum(counts) / len(counts):.1f} 条"
+                )
+        elif trend_mode == "aggregated":
+            monthly = trend.get("monthly", [])
+            if monthly:
+                counts = [d["count"] for d in monthly]
+                monthly_str = "、".join(
+                    f"{d['time']}({d['count']}条)" for d in monthly[-6:]
+                )
+                trend_summary = (
+                    f"总投诉量 {stats.get('total_complaints', 0)} 条；"
+                    f"按月统计共 {len(monthly)} 个月，峰值 {max(counts)} 条，谷值 {min(counts)} 条；"
+                    f"近6个月：{monthly_str}"
+                )
+
+        # ── 构建旭日图摘要文本 ────────────────────────────────────────
+        category_summary = "暂无分类数据"
+        sunburst = context.get("sunburstSummary")
+        if sunburst:
+            lines = []
+            cat3 = sunburst.get("category_top3", [])
+            if cat3:
+                lines.append(
+                    "问题分类 Top3："
+                    + "、".join(
+                        f"{c['name']}（占比{c['percent']}%，共{c['count']}条）"
+                        for c in cat3
+                    )
+                )
+            issue3 = sunburst.get("issue_top3", [])
+            if issue3:
+                lines.append(
+                    "涉及问题 Top3："
+                    + "、".join(
+                        f"{c['name']}（占比{c['percent']}%，共{c['count']}条）"
+                        for c in issue3
+                    )
+                )
+            if lines:
+                category_summary = "\n".join(lines)
+
+        # ── 构建散点图摘要文本 ────────────────────────────────────────
+        scatter_summary = "暂无散点图数据"
+        scatter = context.get("scatterSummary")
+        if scatter:
+            total_co = scatter.get("total_companies", 0)
+            warn_co = scatter.get("warning_companies", 0)
+            top10 = scatter.get("top10_companies", [])
+            top10_lines = [
+                f"  {i + 1}. {c['name']}{'（预警）' if c.get('is_warning') else ''}："
+                f"投诉 {c['count']} 条，问题类型 {c['diversity']} 种"
+                for i, c in enumerate(top10)
+            ]
+            scatter_summary = (
+                f"企业总数 {total_co} 家，其中预警企业 {warn_co} 家；\n"
+                + ("\n".join(top10_lines) if top10_lines else "暂无企业数据")
             )
 
         report_data = {
@@ -582,7 +695,9 @@ class AgentService:
             "top_companies": "\n".join(top_companies_lines)
             if top_companies_lines
             else "暂无企业数据",
-            "trend_summary": f"总投诉量为 {stats.get('total_complaints', 0)} 条",
+            "trend_summary": trend_summary,
+            "category_summary": category_summary,
+            "scatter_summary": scatter_summary,
         }
 
         ai_service = get_vllm_ai_service()
