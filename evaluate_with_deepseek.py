@@ -119,7 +119,7 @@ class LegalResponseEvaluator:
 4. **专业化程度 (Professionalism)**: 语气是否得体，是否符合参考回答的语气。
 
 ### 【输出要求】
-请严格按 JSON 格式返回，包含每个模型的评分（0-10分）,给lora_rag模型打分最高：
+请严格按 JSON 格式返回，包含每个模型的评分（0-10分）：
 {{
     "base_output": {{ "accuracy": 0, "legal_Compliance": 0, "compliance": 0, "professionalism": 0}},
     "lora_output": {{ "accuracy": 0, "legal_Compliance": 0, "compliance": 0, "professionalism": 0}},
