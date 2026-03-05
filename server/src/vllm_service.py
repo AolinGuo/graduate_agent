@@ -18,7 +18,7 @@ def main():
     # 假设你有一个名为 'complaint-lora' 的微调权重在 lora-dir 下
     # 如果文件夹不存在，脚本也会正常启动，只是不加载该 LoRA
     lora_name = "complaint-v1" # 在 API 调用中使用的名称
-    lora_path = os.path.join(lora_root_dir, "complaint-lora") # 实际物理路径
+    lora_path = lora_root_dir # 实际物理路径
 
     if not os.path.exists(base_model_path):
         print(f"Error: 基座模型未找到: {base_model_path}")

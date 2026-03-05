@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AI服务模块 - 使用vLLM加速推理
-支持流式输出(pipeline)和批处理
-"""
-
 import logging
 from typing import Optional, Dict, Any, Generator
 import os

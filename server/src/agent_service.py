@@ -236,7 +236,7 @@ class AgentService:
                 user_input=user_message,
                 system_prompt=system_prompt,
                 temperature=0.3,  # 较低温度，提高准确性
-                max_tokens=512,
+                max_tokens=2048,
                 stream=False,
             )
 
