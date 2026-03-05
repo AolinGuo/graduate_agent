@@ -42,9 +42,9 @@
             <span class="example-icon">📈</span>
             显示2024年的投诉趋势
           </li>
-          <li @click="sendExampleQuery('生成本月报告')">
+          <li @click="sendExampleQuery('生成投诉分析报告')">
             <span class="example-icon">📋</span>
-            生成本月报告
+            生成投诉分析报告
           </li>
         </ul>
       </div>

@@ -225,7 +225,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, nextTick, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Setting } from '@element-plus/icons-vue'
 import * as d3 from 'd3'
@@ -651,6 +651,31 @@ const filteredCompanyRanking = computed(() => {
 onMounted(() => {
     initializeDashboard()
 })
+
+// 方案B：监听日期变化，自动刷新其他图表
+watch(
+  [() => filters.value.startDate, () => filters.value.endDate],
+  async ([newStart, newEnd], [oldStart, oldEnd]) => {
+    if (!newStart || !newEnd) return
+    if (newStart === oldStart && newEnd === oldEnd) return
+    // 刷新仪表板统计、趋势图（及子组件通过prop响应）
+    await loadDashboardData()
+    await loadTrendData()
+    // 旭日图和散点图通过 :start-date/:end-date prop 自动响应
+  }
+)
+
+// 方案A：监听日期变化，仅在已执行过时序分析时自动刷新
+watch(
+  [() => filters.value.startDate, () => filters.value.endDate],
+  ([newStart, newEnd], [oldStart, oldEnd]) => {
+    if (!newStart || !newEnd) return
+    if (newStart === oldStart && newEnd === oldEnd) return
+    if (timeSeriesResults.value) {
+      performTimeSeriesAnalysis()
+    }
+  }
+)
 </script>
 
 <style scoped>
