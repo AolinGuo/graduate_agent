@@ -12,7 +12,7 @@ from pathlib import Path
 
 # ---------- 统一管理后台 GPU 分配 ----------
 # 可通过环境变量 GPU_ID 进行覆盖
-gpu_id = os.getenv("GPU_ID", "2")
+gpu_id = os.getenv("GPU_ID", "6")
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
 # ----------------------------------------
 
