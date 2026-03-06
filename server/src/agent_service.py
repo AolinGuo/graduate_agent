@@ -84,7 +84,12 @@ class DeepseekService:
         temperature: float = 0.2,
         max_tokens: int = 4096,
         response_format: Optional[Dict[str, str]] = None,
-    ) -> str:
+        tools: Optional[List[Dict]] = None,
+    ):
+        """调用 Deepseek chat completions，支持 tool calling。
+        返回原始 response.choices[0].message 对象（而非字符串），
+        以便调用方自行判断 finish_reason 和 tool_calls。
+        """
         try:
             kwargs = {
                 "model": self.model,
@@ -95,9 +100,12 @@ class DeepseekService:
             }
             if response_format:
                 kwargs["response_format"] = response_format
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = "auto"
 
             response = self.client.chat.completions.create(**kwargs)
-            return response.choices[0].message.content
+            return response.choices[0].message
         except Exception as e:
             logger.error(f"Deepseek API 调用失败: {e}", exc_info=True)
             raise
@@ -114,82 +122,122 @@ def get_deepseek_service() -> DeepseekService:
 
 
 # ============================================================
-# 工具定义
+# 工具定义（OpenAI / Deepseek 标准 function calling 格式）
 # ============================================================
 TOOLS = [
     {
-        "name": "read_frontend_display",
-        "description": "读取前端仪表板当前显示的内容（统计、筛选、排名等）。分析现状前的必要步骤。",
-        "parameters": {},
-        "action_type": "read_display",
-    },
-    {
-        "name": "update_frontend_filter",
-        "description": "更改前端全局筛选条件（日期、企业、行业等）。",
-        "parameters": {
-            "start_date": {
-                "type": "string",
-                "description": "开始日期，格式 YYYY-MM-DD（可选）",
-            },
-            "end_date": {
-                "type": "string",
-                "description": "结束日期，格式 YYYY-MM-DD（可选）",
-            },
-            "companies": {
-                "type": "array",
-                "description": "企业名称列表，精确匹配（可选）",
-            },
-            "industries": {
-                "type": "array",
-                "description": "行业名称列表（可选）",
-            },
-            "industry_level1": {
-                "type": "array",
-                "description": "行业名称(一级)列表（可选）",
-            },
-            "industry_level2": {
-                "type": "array",
-                "description": "行业名称(二级)列表（可选）",
-            },
-            "industry_level3": {
-                "type": "array",
-                "description": "行业名称(三级)列表（可选）",
-            },
-            "categories": {
-                "type": "array",
-                "description": "投诉问题分类列表（可选）",
-            },
-            "issue_level1": {
-                "type": "array",
-                "description": "涉及问题(一级)列表（可选）",
-            },
-            "issue_level2": {
-                "type": "array",
-                "description": "涉及问题(二级)列表（可选）",
+        "type": "function",
+        "function": {
+            "name": "read_frontend_display",
+            "description": "读取前端仪表板当前显示的内容（统计、筛选、排名等）。分析现状前的必要步骤。",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
             },
         },
-        "action_type": "filter_data",
+        # 内部元数据，不上传给模型
+        "_action_type": "read_display",
     },
     {
-        "name": "generate_report",
-        "description": "基于当前统计数据编写专业的分析报告。",
-        "parameters": {
-            "start_date": {"type": "string", "description": "开始日期"},
-            "end_date": {"type": "string", "description": "结束日期"},
+        "type": "function",
+        "function": {
+            "name": "update_frontend_filter",
+            "description": "更改前端全局筛选条件（日期、企业、行业等）。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "开始日期，格式 YYYY-MM-DD",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "结束日期，格式 YYYY-MM-DD",
+                    },
+                    "companies": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "企业名称列表，精确匹配",
+                    },
+                    "industries": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "行业名称列表",
+                    },
+                    "industry_level1": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "行业名称(一级)列表",
+                    },
+                    "industry_level2": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "行业名称(二级)列表",
+                    },
+                    "industry_level3": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "行业名称(三级)列表",
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "投诉问题分类列表",
+                    },
+                    "issue_level1": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "涉及问题(一级)列表",
+                    },
+                    "issue_level2": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "涉及问题(二级)列表",
+                    },
+                },
+                "required": [],
+            },
         },
-        "action_type": "show_report",
+        "_action_type": "filter_data",
     },
     {
-        "name": "generate_reply_suggestion",
-        "description": "调用本地大模型生成官方回复建议。",
-        "parameters": {
-            "complaint_content": {"type": "string", "description": "投诉原文"},
+        "type": "function",
+        "function": {
+            "name": "generate_report",
+            "description": "基于当前统计数据编写专业的投诉分析报告。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "报告开始日期"},
+                    "end_date": {"type": "string", "description": "报告结束日期"},
+                },
+                "required": [],
+            },
         },
-        "action_type": "show_reply",
+        "_action_type": "show_report",
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_reply_suggestion",
+            "description": "调用本地大模型为用户提供的投诉原文生成官方回复建议。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "complaint_content": {"type": "string", "description": "投诉原文"},
+                },
+                "required": ["complaint_content"],
+            },
+        },
+        "_action_type": "show_reply",
     },
 ]
 
-_TOOL_MAP: Dict[str, dict] = {t["name"]: t for t in TOOLS}
+# 传给模型的工具列表（只含 type + function，不含内部 _action_type）
+_TOOLS_FOR_API = [{"type": t["type"], "function": t["function"]} for t in TOOLS]
+# 内部映射表：工具名 → 完整元数据
+_TOOL_MAP: Dict[str, dict] = {t["function"]["name"]: t for t in TOOLS}
 
 
 class AgentService:
@@ -202,12 +250,6 @@ class AgentService:
 
     def _get_deepseek_service(self):
         return get_deepseek_service()
-
-    def _build_tools_prompt(self) -> str:
-        lines = []
-        for i, tool in enumerate(TOOLS, 1):
-            lines.append(f"{i}. {tool['name']}: {tool['description']}")
-        return "\n".join(lines)
 
     def _extract_context_info(self, context: Optional[Dict[str, Any]]) -> str:
         """从 context 中提取可读的当前状态描述"""
@@ -298,140 +340,119 @@ class AgentService:
     def process_message(
         self, user_message: str, context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """多轮对话与流水线执行逻辑"""
+        """使用 Deepseek 原生工具调用（function calling）处理用户消息。
+
+        流程：
+        1. 携带 tools 列表发起首轮请求
+        2. 若模型返回 tool_calls → 逐个执行工具 → 将结果以 role:tool 追加进对话
+        3. 若遇到 update_frontend_filter，立即中断并告知前端刷新
+        4. 执行完所有工具后，发起第二轮请求获取最终自然语言回复
+        """
         try:
             self._last_context = context
             deepseek = self._get_deepseek_service()
-            messages = []
 
-            # --- Round 1: 规划 ---
-            tools_prompt = self._build_tools_prompt()
             context_info = self._extract_context_info(context)
-            system_planner = f"""你是一个投诉处理助手。请分析用户意图并拆解任务。
-## 可用工具
-{tools_prompt}
-## 当前状态
-{context_info}
-
-#意图识别规则
-# 1.**明确执行步骤**:先分析用户完整意图，再列出需要依次执行的工具步骤。
-# 2.**工具调用顺序**若用户要求「筛选数据后再分析」，应先调用‘update_frontend_filter，再调用‘run_time_series_analysis'。若用户要求「查看当前数据并生成报告」，应先调用 ‘read_frontend_display，再调用 ‘generate_report。单步任务(如仅筛选、仅查看、仅生成报告)只调用一个工具。
-# 3.**参数解析**:
-- 年份 (如 [2023年」)  start_date:"2023-01-01",end_date:"2023-12-31"
-- 企业名称>companies数组
-# 4.**generate_reply_suggestion**:仅在用户明确提供投诉原文并要求起草回复时调用。
-5.**read_frontend_display**:仅在用户询问当前显示内容时调用，无需任何参数。
-
-{
-  "thought": "对用户意图的分析，说明选择该工具的原因",
-  "steps": [
-    {
-      "step": 1,
-      "tool": "工具名称",
-      "parameters": {
-        "参数名": "参数值"
-      },
-      "reason": "此步骤的作用"
-    }
-  ],
-  "message": "给用户的简洁友好回复（中文，不超过50字）"
-}
-若只需一个工具，steps列表只有一项。
-
-"""
-
-            messages.append({"role": "system", "content": system_planner})
-            messages.append({"role": "user", "content": user_message})
-
-            planner_reply = deepseek.chat(
-                messages, temperature=0.1, response_format={"type": "json_object"}
+            system_prompt = (
+                "你是一个专业的投诉处理助手，可以调用工具帮助用户分析数据、筛选数据、生成报告或起草回复。"
+                "请根据用户意图选择合适的工具，工具执行顺序应符合逻辑（如需先筛选再分析）。\n"
+                "generate_reply_suggestion 仅在用户提供了具体投诉原文时调用。\n"
             )
-            intent = json.loads(planner_reply)
-            steps = intent.get("steps", [])
+            if context_info:
+                system_prompt += f"\n## 当前仪表板状态\n{context_info}"
 
-            # 如果没有工具调用，直接返回消息
-            if not steps:
-                final_message = intent.get("message", "已按要求完成操作。")
-                return {
-                    "success": True,
-                    "message": final_message,
-                    "action": None,
-                    "thinking": intent.get("thought"),
-                }
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
 
-            # --- 执行流水线 ---
             last_action = None
+            thinking = None
 
-            requests_str_list = []
-            responses_str_list = []
-
-            for step in steps:
-                tool_name = step.get("tool")
-                if not tool_name:
-                    continue
-                params = step.get("parameters", {})
-
-                # 实例化 FuncCallRequest
-                req = FuncCallRequest(
-                    tool_name=tool_name,
-                    parameters=params,
-                    thought=step.get("reason", ""),
+            # ---- 工具调用循环 ----
+            MAX_ROUNDS = 5  # 防止无限循环
+            for _round in range(MAX_ROUNDS):
+                msg = deepseek.chat(
+                    messages,
+                    temperature=0.1,
+                    tools=_TOOLS_FOR_API,
                 )
-                requests_str_list.append(str(req))
 
-                # 执行当前工具
-                res = self._call_tool(tool_name, params)
+                # 将模型回复追加进对话历史
+                messages.append(msg)  # openai message 对象可直接 append
 
-                # 实例化 FuncCallResponse
-                resp = FuncCallResponse(
-                    tool_name=tool_name,
-                    result=res.get("data") if res.get("success") else res.get("error"),
-                    success=res.get("success", False),
-                )
-                responses_str_list.append(str(resp))
-
-                if res.get("success") and tool_name in _TOOL_MAP:
-                    # 记录动作
-                    last_action = {
-                        "type": _TOOL_MAP[tool_name]["action_type"],
-                        "data": res["data"],
-                        "tool": tool_name,
+                # 无工具调用 → 循环结束，使用当前内容作为最终回复
+                if not msg.tool_calls:
+                    final_message = msg.content or "已按要求完成操作。"
+                    return {
+                        "success": True,
+                        "message": final_message,
+                        "action": last_action,
+                        "thinking": thinking,
                     }
-                    if tool_name == "update_frontend_filter":
-                        logger.info("检测到数据筛选请求，触发中断机制，等待前端刷新。")
-                        return {
-                            "success": True,
-                            "message": f"正在为您调整数据范围，请稍候...",
-                            "action": last_action,
-                            "thinking": intent.get("thought"),
-                            "need_callback": True,  # 告知前端执行完此 action 后需要自动回调
+
+                # 有工具调用 → 逐个执行
+                for tool_call in msg.tool_calls:
+                    tool_name = tool_call.function.name
+                    try:
+                        params = json.loads(tool_call.function.arguments or "{}")
+                    except json.JSONDecodeError:
+                        params = {}
+
+                    logger.info(
+                        f"[Round {_round + 1}] 调用工具: {tool_name}, 参数: {params}"
+                    )
+
+                    res = self._call_tool(tool_name, params)
+                    tool_result_str = json.dumps(
+                        res.get("data")
+                        if res.get("success")
+                        else {"error": res.get("error")},
+                        ensure_ascii=False,
+                    )
+
+                    # 追加工具结果消息（role: tool）
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_result_str,
+                        }
+                    )
+
+                    if res.get("success") and tool_name in _TOOL_MAP:
+                        last_action = {
+                            "type": _TOOL_MAP[tool_name]["_action_type"],
+                            "data": res["data"],
+                            "tool": tool_name,
                         }
 
-            # --- Round 2: 结合工具结果生成最终回复 ---
-            if requests_str_list and responses_str_list:
-                # 将 str(FuncCallRequest) 附加为 assistant 消息
-                messages.append(
-                    {"role": "assistant", "content": "\n".join(requests_str_list)}
-                )
-                # 将 str(FuncCallResponse) 附加为 user 消息，请求最终总结
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"以下是工具执行的结果：\n{chr(10).join(responses_str_list)}\n请根据以上工具返回结果，直接给出对我的最终回复（请直接使用自然语言回复，不要输出JSON）。",
-                    }
-                )
+                        # update_frontend_filter：立即中断，等待前端刷新后回调
+                        if tool_name == "update_frontend_filter":
+                            logger.info(
+                                "检测到数据筛选请求，触发中断机制，等待前端刷新。"
+                            )
+                            return {
+                                "success": True,
+                                "message": "正在为您调整数据范围，请稍候...",
+                                "action": last_action,
+                                "thinking": thinking,
+                                "need_callback": True,
+                            }
 
-                # 发起第二轮对话生成最终结果
-                final_reply = deepseek.chat(messages, temperature=0.7)
-                final_message = final_reply
-            else:
-                final_message = intent.get("message", "已按要求完成操作。")
-
+            # 超过最大轮次，返回最后一条内容
+            logger.warning("工具调用轮次已达上限，强制返回。")
+            last_msg = messages[-1]
+            final_message = (
+                last_msg.get("content", "已按要求完成操作。")
+                if isinstance(last_msg, dict)
+                else getattr(last_msg, "content", "已按要求完成操作。")
+            )
             return {
                 "success": True,
                 "message": final_message,
                 "action": last_action,
-                "thinking": intent.get("thought"),
+                "thinking": thinking,
             }
 
         except Exception as e:
