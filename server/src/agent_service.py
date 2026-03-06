@@ -312,7 +312,7 @@ class AgentService:
 {tools_prompt}
 ## 当前状态
 {context_info}
-Lcontext_into 1t context_into else(无工下又数据)
+
 #意图识别规则
 # 1.**明确执行步骤**:先分析用户完整意图，再列出需要依次执行的工具步骤。
 # 2.**工具调用顺序**若用户要求「筛选数据后再分析」，应先调用‘update_frontend_filter，再调用‘run_time_series_analysis'。若用户要求「查看当前数据并生成报告」，应先调用 ‘read_frontend_display，再调用 ‘generate_report。单步任务(如仅筛选、仅查看、仅生成报告)只调用一个工具。
@@ -322,15 +322,22 @@ Lcontext_into 1t context_into else(无工下又数据)
 # 4.**generate_reply_suggestion**:仅在用户明确提供投诉原文并要求起草回复时调用。
 5.**read_frontend_display**:仅在用户询问当前显示内容时调用，无需任何参数。
 
-
-
-"thought":"对用户意图的分析，说明选择该工具的原因"，"steps":[
-"step":
-"tool”:"工具名称"
-"parameters":{{"参数名""参数值"}}，
-"reason":"此步骤的作用"
-message”:"给用户的简洁友好回复中文，不超过5e字，”
+{
+  "thought": "对用户意图的分析，说明选择该工具的原因",
+  "steps": [
+    {
+      "step": 1,
+      "tool": "工具名称",
+      "parameters": {
+        "参数名": "参数值"
+      },
+      "reason": "此步骤的作用"
+    }
+  ],
+  "message": "给用户的简洁友好回复（中文，不超过50字）"
+}
 若只需一个工具，steps列表只有一项。
+
 """
 
             messages.append({"role": "system", "content": system_planner})
