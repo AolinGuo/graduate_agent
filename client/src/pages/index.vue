@@ -721,14 +721,44 @@ const handleAgentAction = async (action) => {
         break
       
       case 'filter_data':
-        if (action.parameters) {
-          if (action.parameters.start_date) filters.value.startDate = action.parameters.start_date
-          if (action.parameters.end_date) filters.value.endDate = action.parameters.end_date
-          if (action.parameters.companies) filters.value.selectedCompanies = action.parameters.companies
-          if (action.parameters.industries) filters.value.selectedIndustries = action.parameters.industries
-          if (action.parameters.categories) filters.value.selectedCategories = action.parameters.categories
+        {
+          // 从 Agent 返回的数据中解析筛选参数
+          const params = action.data || action.parameters || {}
+
+          // 时间范围（后端为 start_date / end_date）
+          if (params.start_date) filters.value.startDate = params.start_date
+          if (params.end_date) filters.value.endDate = params.end_date
+
+          // 企业与行业、问题分类（兼容新老字段名）
+          if (params.selectedCompanies || params.companies) {
+            filters.value.selectedCompanies = params.selectedCompanies || params.companies
+          }
+          if (params.selectedIndustries || params.industries) {
+            filters.value.selectedIndustries = params.selectedIndustries || params.industries
+          }
+          if (params.selectedIndustryLevel1) {
+            filters.value.selectedIndustryLevel1 = params.selectedIndustryLevel1
+          }
+          if (params.selectedIndustryLevel2) {
+            filters.value.selectedIndustryLevel2 = params.selectedIndustryLevel2
+          }
+          if (params.selectedIndustryLevel3) {
+            filters.value.selectedIndustryLevel3 = params.selectedIndustryLevel3
+          }
+
+          if (params.selectedCategories || params.categories) {
+            filters.value.selectedCategories = params.selectedCategories || params.categories
+          }
+          if (params.selectedIssueLevel1) {
+            filters.value.selectedIssueLevel1 = params.selectedIssueLevel1
+          }
+          if (params.selectedIssueLevel2) {
+            filters.value.selectedIssueLevel2 = params.selectedIssueLevel2
+          }
           
+          // 应用新的筛选条件后刷新仪表板和趋势
           await loadDashboardData()
+          await loadTrendData()
           ElMessage.success('已应用筛选条件')
         }
         break

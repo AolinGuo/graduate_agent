@@ -1,8 +1,4 @@
 import os
-# ================= 指定 GPU 6 =================
-# 【已注释】不再在此处设置 CUDA_VISIBLE_DEVICES，由主程序统一管理GPU分配
-# os.environ["CUDA_VISIBLE_DEVICES"] = "6"
-# =============================================
 
 from langchain_community.vectorstores import FAISS
 
@@ -16,15 +12,22 @@ except ImportError:
 class LegalRAGService:
     def __init__(self, device: str = None):
         # 1. 定义路径，优先使用环境变量配置（适配Linux部署）
-        self.vector_db_path = os.getenv("RAG_VECTOR_PATH", os.path.join("rag_vector"))
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
         self.model_path = os.getenv(
-            "EMBEDDING_MODEL_PATH", os.path.join("embedding_model")
+            "EMBEDDING_MODEL_PATH",
+            os.path.join(BASE_DIR, "embedding_model")
+        )
+
+        self.vector_db_path = os.getenv(
+            "RAG_VECTOR_PATH",
+            os.path.join(BASE_DIR, "rag_vector")
         )
         self.vector_db = None
 
         # 2. 设备配置：优先级为 参数 > 环境变量 RAG_GPU_DEVICE > cuda:4
         if device is None:
-            device = os.getenv("RAG_GPU_DEVICE", "cuda:4")
+            device = os.getenv("RAG_GPU_DEVICE", "cuda:0")
         self.device = device
 
         print(f"📌 Embedding模型路径: {self.model_path}")
@@ -49,7 +52,7 @@ class LegalRAGService:
                 model_kwargs={
                     "device": device,
                     "trust_remote_code": True,
-                },  # 关键：允许腾讯模型代码
+                },  
                 encode_kwargs={"normalize_embeddings": True},
             )
 

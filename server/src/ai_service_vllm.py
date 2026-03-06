@@ -28,7 +28,7 @@ VLLM_CONFIG = {
         # tensor_parallel_size: 使用GPU数量，单卡设为1，多卡改为对应数量
         "tensor_parallel_size": int(os.getenv("TENSOR_PARALLEL_SIZE", "1")),
         "dtype": os.getenv("MODEL_DTYPE", "bfloat16"),
-        "max_model_len": int(os.getenv("MAX_MODEL_LEN", "4096")),
+        "max_model_len": int(os.getenv("MAX_MODEL_LEN", "9192")),
         "gpu_memory_utilization": float(os.getenv("GPU_MEM_UTIL", "0.9")),
         "trust_remote_code": True,
     },
@@ -39,7 +39,7 @@ VLLM_CONFIG = {
         "report_temperature": 0.7,
         "report_max_tokens": 2048,
         "reply_temperature": 0.7,
-        "reply_max_tokens": 512,
+        "reply_max_tokens": 4096,
     },
     "streaming": {
         "enabled": True,
@@ -369,7 +369,7 @@ class VLLMAIService:
 
         # ── 2. 构建系统提示词（含法律参考）──────────────────────────────
         base_prompt = """
-你是一个专业的法律投诉处理助手。请根据用户的投诉内容和提供的法律条文，以第一人称（我/我们）的口吻，生成回复。回复需涵盖事件处理结果，并有理有据地引用法律条文解释原因，态度礼貌且专业。"
+你是一个专业的法律投诉处理助手。请根据用户的投诉内容和提供的法律条文，以第一人称（我/我们）的口吻，生成回复。回复需涵盖事件处理结果，并有理有据地引用法律条文解释原因，态度礼貌且专业。仅使用纯文本格式，所有内容以自然段落呈现，无需任何格式标记"
 """
 
         if legal_context:

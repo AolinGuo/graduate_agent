@@ -404,11 +404,16 @@ class AgentService:
                     )
 
                     res = self._call_tool(tool_name, params)
-                    tool_result_str = json.dumps(
+                    # 将工具结果安全地序列化为 JSON 字符串，避免 ChatCompletionMessage 等对象不可序列化报错
+                    tool_result_payload = (
                         res.get("data")
                         if res.get("success")
-                        else {"error": res.get("error")},
+                        else {"error": res.get("error")}
+                    )
+                    tool_result_str = json.dumps(
+                        tool_result_payload,
                         ensure_ascii=False,
+                        default=str,  # 对于无法直接序列化的对象，退化为字符串表示
                     )
 
                     # 追加工具结果消息（role: tool）
