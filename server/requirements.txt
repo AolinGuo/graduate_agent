@@ -55,3 +55,5 @@ faiss-cpu>=1.7.4  # 向量数据库（CPU版本）
 sentence-transformers>=2.2.0  # 文本向量化模型
 chromadb>=0.4.0  # 可选的向量数据库
 tiktoken>=0.5.0  # Token计数工具
+
+vllm
