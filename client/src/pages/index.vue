@@ -650,7 +650,12 @@ const handleAgentAction = async (action) => {
         break
       
       case 'show_report':
-        ElMessage.success('报告已生成')
+        if (action.data && action.data.report) {
+          aiReport.value = action.data.report
+          ElMessage.success('报告已生成并在下方显示')
+        } else {
+          ElMessage.warning('报告生成成功，但未返回内容')
+        }
         break
       
       case 'show_rag':
