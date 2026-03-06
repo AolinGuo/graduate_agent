@@ -41,7 +41,7 @@ def main():
     print(f"📌 使用 GPU: {os.environ.get('CUDA_VISIBLE_DEVICES', '未设置')}")
     print(f"📌 并行规模 (TP): {num_gpus}")
     print(f"📌 基座模型: {os.environ.get('MODEL_PATH', 'server/model-dir')}")
-    print(f"📌 LoRA权重: {os.environ.get('LORA_PATH', '未设置')}")
+    print(f"📌 LoRA权重: {os.environ.get('LORA_PATH', 'server/lora-dir')}")
 
     try:
         # ---------- 2. 在内部延迟导入并加载模型 ----------
