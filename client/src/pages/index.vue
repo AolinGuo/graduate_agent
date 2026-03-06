@@ -210,10 +210,47 @@
                     />
                 </el-tab-pane>
                 <el-tab-pane label="AI回复" name="reply">
-                    <div class="ai-content-scroll">
-                        <el-input v-model="complaintInput" type="textarea" :rows="3" placeholder="输入投诉内容" size="small" />
-                        <el-button size="small" type="primary" plain class="w-full mt-5" @click="handleGenerateAIReply" :loading="aiReplyLoading">生成回复</el-button>
-                        <div v-if="aiReply" class="ai-text mt-5">{{ aiReply }}</div>
+                    <div class="reply-module">
+                      <!-- Input card -->
+                      <div class="reply-input-card">
+                        <div class="reply-input-label">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="label-icon"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          投诉原文
+                        </div>
+                        <textarea
+                          v-model="complaintInput"
+                          class="reply-textarea"
+                          placeholder="粘贴投诉原文，AI将为您起草官方回复…"
+                          rows="4"
+                          :disabled="aiReplyLoading"
+                        ></textarea>
+                        <div class="reply-input-footer">
+                          <span class="char-count">{{ complaintInput.length }} 字</span>
+                          <button class="reply-generate-btn" @click="handleGenerateAIReply" :disabled="!complaintInput.trim() || aiReplyLoading">
+                            <span v-if="aiReplyLoading" class="btn-spinner"></span>
+                            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            {{ aiReplyLoading ? '生成中…' : '生成回复' }}
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Result card -->
+                      <transition name="reply-fade">
+                        <div v-if="aiReply" class="reply-result-card">
+                          <div class="reply-result-header">
+                            <div class="result-badge">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round"/></svg>
+                              AI 回复建议
+                            </div>
+                            <button class="copy-btn" @click="copyReply" :class="{copied: replyJustCopied}">
+                              <svg v-if="!replyJustCopied" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
+                              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                              {{ replyJustCopied ? '已复制' : '复制' }}
+                            </button>
+                          </div>
+                          <div class="reply-result-body">{{ aiReply }}</div>
+                        </div>
+                      </transition>
                     </div>
                 </el-tab-pane>
             </el-tabs>
@@ -293,6 +330,7 @@ const aiReportLoading = ref(false)
 const aiReply = ref('')
 const aiReplyLoading = ref(false)
 const complaintInput = ref('')
+const replyJustCopied = ref(false)
 
 // Selection & Detail
 const scatterSelection = ref([])
@@ -555,6 +593,17 @@ const handleGenerateAIReply = async () => {
     } finally { aiReplyLoading.value = false }
 }
 
+const copyReply = async () => {
+  if (!aiReply.value) return
+  try {
+    await navigator.clipboard.writeText(aiReply.value)
+    replyJustCopied.value = true
+    setTimeout(() => { replyJustCopied.value = false }, 2000)
+  } catch {
+    ElMessage.warning('复制失败，请手动选择文本')
+  }
+}
+
 const formatReportText = (text) => text ? text.replace(/\n/g, '<br/>') : ''
 
 // 趋势数据智能压缩：≤20个点全传；>20个点改传按周和按月聚合的统计
@@ -658,6 +707,15 @@ const handleAgentAction = async (action) => {
         }
         break
       
+      case 'show_reply':
+        if (action.data && action.data.reply) {
+          aiReply.value = action.data.reply
+          if (action.data.complaint_content) complaintInput.value = action.data.complaint_content
+          activeAITab.value = 'reply'
+          ElMessage.success('回复建议已生成')
+        }
+        break
+
       case 'show_rag':
         ElMessage.success('法律咨询结果已获取')
         break
@@ -923,6 +981,214 @@ watch(
     flex-direction: column;
     overflow: hidden;
 }
+/* ───────── AI Reply Module ───────── */
+.reply-module {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  background: #f8f9ff;
+}
+
+.reply-input-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e8e4f8;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.07);
+}
+
+.reply-input-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6366f1;
+  letter-spacing: 0.3px;
+}
+
+.label-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.reply-textarea {
+  width: 100%;
+  resize: none;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: #fafbff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.reply-textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  background: white;
+}
+
+.reply-textarea:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.reply-textarea::placeholder { color: #c4c9d4; }
+
+.reply-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.char-count {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.reply-generate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.reply-generate-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+}
+
+.reply-generate-btn:disabled {
+  background: #d1d5db;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.reply-generate-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.btn-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Result card */
+.reply-result-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #d1fae5;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(5, 150, 105, 0.08);
+}
+
+.reply-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.result-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.result-badge svg {
+  width: 13px;
+  height: 13px;
+  color: #10b981;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #065f46;
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px solid #6ee7b7;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.copy-btn.copied {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.copy-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.reply-result-body {
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Transition */
+.reply-fade-enter-active {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.reply-fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.97);
+}
+
+/* Keep old ai-content-scroll for other potential uses */
 .ai-content-scroll {
     flex: 1;
     overflow-y: auto;
