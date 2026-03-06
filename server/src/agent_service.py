@@ -17,6 +17,44 @@ import logging
 from typing import Dict, Any, Optional, List
 
 
+class FuncCallRequest:
+    def __init__(self, tool_name: str, parameters: Dict[str, Any], thought: str = ""):
+        self.tool_name = tool_name
+        self.parameters = parameters
+        self.thought = thought
+
+    def __str__(self) -> str:
+        return json.dumps(
+            {
+                "FuncCallRequest": {
+                    "thought": self.thought,
+                    "tool": self.tool_name,
+                    "parameters": self.parameters,
+                }
+            },
+            ensure_ascii=False,
+        )
+
+
+class FuncCallResponse:
+    def __init__(self, tool_name: str, result: Any, success: bool):
+        self.tool_name = tool_name
+        self.result = result
+        self.success = success
+
+    def __str__(self) -> str:
+        return json.dumps(
+            {
+                "FuncCallResponse": {
+                    "tool_name": self.tool_name,
+                    "success": self.success,
+                    "result": self.result,
+                }
+            },
+            ensure_ascii=False,
+        )
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +83,7 @@ class DeepseekService:
         messages: List[Dict[str, str]],
         temperature: float = 0.2,
         max_tokens: int = 4096,
-        response_format: Optional[Dict[str, str]] = None
+        response_format: Optional[Dict[str, str]] = None,
     ) -> str:
         try:
             kwargs = {
@@ -138,7 +176,6 @@ TOOLS = [
         "parameters": {
             "start_date": {"type": "string", "description": "开始日期"},
             "end_date": {"type": "string", "description": "结束日期"},
-            
         },
         "action_type": "show_report",
     },
@@ -299,27 +336,59 @@ message”:"给用户的简洁友好回复中文，不超过5e字，”
             messages.append({"role": "system", "content": system_planner})
             messages.append({"role": "user", "content": user_message})
 
-            planner_reply = deepseek.chat(messages, temperature=0.1, response_format={"type": "json_object"})
+            planner_reply = deepseek.chat(
+                messages, temperature=0.1, response_format={"type": "json_object"}
+            )
             intent = json.loads(planner_reply)
             steps = intent.get("steps", [])
 
+            # 如果没有工具调用，直接返回消息
+            if not steps:
+                final_message = intent.get("message", "已按要求完成操作。")
+                return {
+                    "success": True,
+                    "message": final_message,
+                    "action": None,
+                    "thinking": intent.get("thought"),
+                }
+
             # --- 执行流水线 ---
             last_action = None
-            final_message = ""
+
+            requests_str_list = []
+            responses_str_list = []
 
             for step in steps:
                 tool_name = step.get("tool")
+                if not tool_name:
+                    continue
                 params = step.get("parameters", {})
-                
+
+                # 实例化 FuncCallRequest
+                req = FuncCallRequest(
+                    tool_name=tool_name,
+                    parameters=params,
+                    thought=step.get("reason", ""),
+                )
+                requests_str_list.append(str(req))
+
                 # 执行当前工具
                 res = self._call_tool(tool_name, params)
-                
-                if res["success"]:
+
+                # 实例化 FuncCallResponse
+                resp = FuncCallResponse(
+                    tool_name=tool_name,
+                    result=res.get("data") if res.get("success") else res.get("error"),
+                    success=res.get("success", False),
+                )
+                responses_str_list.append(str(resp))
+
+                if res.get("success") and tool_name in _TOOL_MAP:
                     # 记录动作
                     last_action = {
-                        "type": _TOOL_MAP[tool_name]["action_type"], 
-                        "data": res["data"], 
-                        "tool": tool_name
+                        "type": _TOOL_MAP[tool_name]["action_type"],
+                        "data": res["data"],
+                        "tool": tool_name,
                     }
                     if tool_name == "update_frontend_filter":
                         logger.info("检测到数据筛选请求，触发中断机制，等待前端刷新。")
@@ -328,25 +397,34 @@ message”:"给用户的简洁友好回复中文，不超过5e字，”
                             "message": f"正在为您调整数据范围，请稍候...",
                             "action": last_action,
                             "thinking": intent.get("thought"),
-                            "need_callback": True  # 告知前端执行完此 action 后需要自动回调
+                            "need_callback": True,  # 告知前端执行完此 action 后需要自动回调
                         }
-                    
-                    # 正常执行其他工具
-                    if tool_name == "generate_reply_suggestion":
-                        final_message = res["data"].get("reply")
-                        break
-                    elif tool_name == "generate_report":
-                        final_message = res["data"].get("report")
 
-            # 如果没有生成报告或回复，则使用规划阶段的 message
-            if not final_message:
+            # --- Round 2: 结合工具结果生成最终回复 ---
+            if requests_str_list and responses_str_list:
+                # 将 str(FuncCallRequest) 附加为 assistant 消息
+                messages.append(
+                    {"role": "assistant", "content": "\n".join(requests_str_list)}
+                )
+                # 将 str(FuncCallResponse) 附加为 user 消息，请求最终总结
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"以下是工具执行的结果：\n{chr(10).join(responses_str_list)}\n请根据以上工具返回结果，直接给出对我的最终回复（请直接使用自然语言回复，不要输出JSON）。",
+                    }
+                )
+
+                # 发起第二轮对话生成最终结果
+                final_reply = deepseek.chat(messages, temperature=0.7)
+                final_message = final_reply
+            else:
                 final_message = intent.get("message", "已按要求完成操作。")
 
             return {
                 "success": True,
                 "message": final_message,
                 "action": last_action,
-                "thinking": intent.get("thought")
+                "thinking": intent.get("thought"),
             }
 
         except Exception as e:
@@ -360,10 +438,14 @@ message”:"给用户的简洁友好回复中文，不超过5e字，”
             return None
 
     def _call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        if tool_name == "read_frontend_display": return self._tool_read_frontend_display()
-        if tool_name == "update_frontend_filter": return self._tool_update_frontend_filter(parameters)
-        if tool_name == "generate_report": return self._tool_generate_report(parameters)
-        if tool_name == "generate_reply_suggestion": return self._tool_generate_reply_suggestion(parameters)
+        if tool_name == "read_frontend_display":
+            return self._tool_read_frontend_display()
+        if tool_name == "update_frontend_filter":
+            return self._tool_update_frontend_filter(parameters)
+        if tool_name == "generate_report":
+            return self._tool_generate_report(parameters)
+        if tool_name == "generate_reply_suggestion":
+            return self._tool_generate_reply_suggestion(parameters)
         return {"success": False, "error": f"未知工具: {tool_name}"}
 
     def _tool_read_frontend_display(self) -> Dict[str, Any]:
@@ -395,10 +477,12 @@ message”:"给用户的简洁友好回复中文，不超过5e字，”
         detailed_data_summary = self._extract_context_info(context)
 
         if not detailed_data_summary or "投诉总量:0" in detailed_data_summary:
-            return {"success": False, "error": "当前前端无有效统计数据，请先尝试筛选或刷新数据。"}
+            return {
+                "success": False,
+                "error": "当前前端无有效统计数据，请先尝试筛选或刷新数据。",
+            }
 
-       
-        #3. 构建深度 Prompt
+        # 3. 构建深度 Prompt
         system_prompt = f"""你是一位专业的政务数据分析专家。根据提供的详细统计数据编写分析报告。
 仅使用纯文本格式，所有内容以自然段落呈现，无需任何格式标记
 报告必须包含：数据基本面分析、投诉趋势研判、重点企业/行业风险评估、以及基于数据的监管对策建议。"""
@@ -411,10 +495,14 @@ message”:"给用户的简洁友好回复中文，不超过5e字，”
 
         deepseek = self._get_deepseek_service()
         # 增加 max_tokens 以容纳更详尽的分析
-        report = deepseek.chat([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_input}
-        ], temperature=0.7, max_tokens=4096)
+        report = deepseek.chat(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_input},
+            ],
+            temperature=0.7,
+            max_tokens=4096,
+        )
 
         return {"success": True, "data": {"report": report}}
 
@@ -465,5 +553,6 @@ def get_agent_service(model_path: str = None) -> AgentService:
     if _agent_service_instance is None:
         _agent_service_instance = AgentService(model_path=model_path)
     return _agent_service_instance
+
 
 _agent_service_instance = None
