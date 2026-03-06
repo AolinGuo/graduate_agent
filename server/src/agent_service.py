@@ -155,42 +155,42 @@ TOOLS = [
                         "type": "string",
                         "description": "结束日期，格式 YYYY-MM-DD",
                     },
-                    "companies": {
+                    "selectedCompanies": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "企业名称列表，精确匹配",
                     },
-                    "industries": {
+                    "selectedIndustries": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "行业名称列表",
                     },
-                    "industry_level1": {
+                    "selectedIndustryLevel1": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "行业名称(一级)列表",
                     },
-                    "industry_level2": {
+                    "selectedIndustryLevel2": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "行业名称(二级)列表",
                     },
-                    "industry_level3": {
+                    "selectedIndustryLevel3": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "行业名称(三级)列表",
                     },
-                    "categories": {
+                    "selectedCategories": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "投诉问题分类列表",
                     },
-                    "issue_level1": {
+                    "selectedIssueLevel1": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "涉及问题(一级)列表",
                     },
-                    "issue_level2": {
+                    "selectedIssueLevel2": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "涉及问题(二级)列表",
