@@ -25,8 +25,7 @@ sys.path.append(SRC_DIR)
 
 # 设置日志
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -36,19 +35,22 @@ logger = logging.getLogger(__name__)
 try:
     # 导入 AI 服务
     from ai_service import get_ai_service
-    
+
     # 导入 RAG 服务类 (而不是导入函数)
     from rag_service import LegalRAGService
-    
+
 except ImportError as e:
     logger.error(f"模块导入失败: {e}")
     logger.error(f"当前 sys.path: {sys.path}")
-    logger.error("请确保 server/src/ai_service.py 和 server/src/rag_service.py 中定义了正确的类")
+    logger.error(
+        "请确保 server/src/ai_service.py 和 server/src/rag_service.py 中定义了正确的类"
+    )
     sys.exit(1)
 
 # -----------------------------------------------------------------------------
 # 4. 核心 Prompt 与处理逻辑
 # -----------------------------------------------------------------------------
+
 
 def generate_legal_search_query(ai_service, question: str) -> str:
     """
@@ -66,19 +68,22 @@ def generate_legal_search_query(ai_service, question: str) -> str:
     4. **输出必须是一个连贯的问句或陈述句**，不要输出关键词列表。
     
     请输出查询语句："""
-    
+
     response = ai_service.generate_response(
         user_input=prompt,
         system_prompt="你是一个法律检索专家。",
         max_new_tokens=100,
-        temperature=0.3
+        temperature=0.3,
     )
-    
+
     # 清洗一下，防止模型输出 "输出：" 之类的前缀
-    query = response['reply'].replace("输出：", "").strip()
+    query = response["reply"].replace("输出：", "").strip()
     return query
 
-def generate_official_reply(ai_service, question: str, old_answer: str, legal_context: str) -> str:
+
+def generate_official_reply(
+    ai_service, question: str, old_answer: str, legal_context: str
+) -> str:
     """
     步骤 2: 结合 RAG 检索结果和旧回答，生成正式回复
     (优化版：处理无记录情况，增强得体性)
@@ -97,7 +102,7 @@ def generate_official_reply(ai_service, question: str, old_answer: str, legal_co
         "2. 引用符合该案例的法律条文。\n"
         "3. 禁止使用Markdown格式，生成完整的一段话。"
     )
-    
+
     user_input = f"""请为以下市民诉求撰写一份正式答复。
 
 【市民诉求摘要】
@@ -129,13 +134,14 @@ def generate_official_reply(ai_service, question: str, old_answer: str, legal_co
         user_input=user_input,
         system_prompt=system_prompt,
         max_new_tokens=600,
-        temperature=0.4 # 保持低温度，防止胡编乱造
+        temperature=0.4,  # 保持低温度，防止胡编乱造
     )
-    
+
     # 后处理：清理可能残留的格式符号
-    reply = response['reply'].replace("**", "").replace("###", "").strip()
-    
+    reply = response["reply"].replace("**", "").replace("###", "").strip()
+
     return reply
+
 
 def process_dataset():
     input_path = os.path.join(CURRENT_DIR, "qa_data.jsonl")
@@ -153,34 +159,37 @@ def process_dataset():
     # 2. 初始化 RAG 检索服务 (实例化类)
     logger.info("正在加载 RAG 检索服务...")
     try:
-        rag_service = LegalRAGService() # 实例化
+        rag_service = LegalRAGService()  # 实例化
     except Exception as e:
         logger.error(f"RAG服务初始化失败: {e}")
         return
 
     processed_count = 0
-    
+
     try:
-        total_lines = sum(1 for _ in open(input_path, 'r', encoding='utf-8') if _.strip())
+        total_lines = sum(
+            1 for _ in open(input_path, "r", encoding="utf-8") if _.strip()
+        )
     except FileNotFoundError:
         logger.error(f"找不到输入文件: {input_path}")
         return
 
     logger.info(f"开始处理，共 {total_lines} 条数据...")
 
-    with open(input_path, 'r', encoding='utf-8') as f_in, \
-         open(output_path, 'w', encoding='utf-8') as f_out:
-        
+    with (
+        open(input_path, "r", encoding="utf-8") as f_in,
+        open(output_path, "w", encoding="utf-8") as f_out,
+    ):
         for line in f_in:
             if not line.strip():
                 continue
-            
+
             try:
                 data = json.loads(line)
-                question = data.get('question', '')
-                old_answer = data.get('answer', '')
-                
-                logger.info(f"[{processed_count+1}/{total_lines}] 正在处理...")
+                question = data.get("question", "")
+                old_answer = data.get("answer", "")
+
+                logger.info(f"[{processed_count + 1}/{total_lines}] 正在处理...")
 
                 # --- Step A: 重写查询 ---
                 search_query = generate_legal_search_query(ai, question)
@@ -190,13 +199,15 @@ def process_dataset():
                 try:
                     # 调用类的实例方法 search
                     retrieved_docs = rag_service.search(search_query, top_k=3)
-                    
+
                     if retrieved_docs:
                         doc_texts = []
                         for idx, doc in enumerate(retrieved_docs):
-                            source = doc.get('source', '法律法规')
-                            content = doc.get('content', '').strip()
-                            doc_texts.append(f"条款{idx+1}（出自《{source}》）: {content}")
+                            source = doc.get("source", "法律法规")
+                            content = doc.get("content", "").strip()
+                            doc_texts.append(
+                                f"条款{idx + 1}（出自《{source}》）: {content}"
+                            )
                         legal_context_str = "\n".join(doc_texts)
                     else:
                         legal_context_str = "（未检索到具体匹配的法律条文）"
@@ -206,7 +217,9 @@ def process_dataset():
                     legal_context_str = "（检索服务暂时不可用）"
 
                 # --- Step C: 生成回复 ---
-                new_reply = generate_official_reply(ai, question, old_answer, legal_context_str)
+                new_reply = generate_official_reply(
+                    ai, question, old_answer, legal_context_str
+                )
 
                 # --- Step D: 写入文件 ---
                 final_input_content = f"【参考法律条文】\n{legal_context_str}"
@@ -215,12 +228,12 @@ def process_dataset():
                     "instruction": question,
                     "input": final_input_content,
                     "output": new_reply,
-                    "system": "你是一名专业的政府投诉处理AI助手，专门负责生成标准化的投诉处理回复。\n\n你的职责包括：\n1. 准确理解市民的投诉内容\n2. 严格按照政府工作流程和法律法规进行回复\n3. 使用正式、规范的公务语言\n\n请根据市民投诉内容，生成符合上述要求的专业回复。"
+                    "system": "你是一名专业的政府投诉处理AI助手，专门负责生成标准化的投诉处理回复。\n\n你的职责包括：\n1. 准确理解市民的投诉内容\n2. 严格按照政府工作流程和法律法规进行回复\n3. 使用正式、规范的公务语言\n\n请根据市民投诉内容，生成符合上述要求的专业回复。",
                 }
 
                 f_out.write(json.dumps(train_item, ensure_ascii=False) + "\n")
-                f_out.flush() 
-                
+                f_out.flush()
+
                 processed_count += 1
 
             except Exception as e:
@@ -230,6 +243,7 @@ def process_dataset():
     # 释放显存
     ai.unload_model()
     logger.info(f"全部处理完成！文件已保存至: {output_path}")
+
 
 if __name__ == "__main__":
     process_dataset()

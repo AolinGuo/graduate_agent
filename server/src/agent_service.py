@@ -4,20 +4,71 @@
 对话Agent服务模块
 支持自然语言意图识别和工具调用
 
-核心工具（5个）：
+核心工具（4个）：
 1. read_frontend_display   - 读取前端当前显示的内容
 2. update_frontend_filter  - 更改前端控制台的筛选条件（日期范围、企业、行业等）
-3. run_time_series_analysis - 执行时序分析，获取投诉趋势数据
-4. generate_report         - 编写投诉分析报告（调用 ai_service_vllm）
-5. generate_reply_suggestion - 生成投诉辅助回复（调用 ai_service_vllm）
+3. generate_report         - 编写投诉分析报告（调用 Deepseek API）
+4. generate_reply_suggestion - 生成投诉辅助回复（调用本地 vLLM）
 """
 
+import os
 import json
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Deepseek API 服务
+# ============================================================
+class DeepseekService:
+    """包装 Deepseek API 调用"""
+
+    def __init__(self):
+        from openai import OpenAI
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            logger.warning(
+                "未找到 DEEPSEEK_API_KEY 环境变量，Deepseek API 调用可能会失败"
+            )
+
+        self.client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        self.model = "deepseek-chat"
+
+    def chat(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.2,
+        max_tokens: int = 1024,
+    ) -> str:
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=False,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Deepseek API 调用失败: {e}", exc_info=True)
+            raise
+
+
+_deepseek_instance = None
+
+
+def get_deepseek_service() -> DeepseekService:
+    global _deepseek_instance
+    if _deepseek_instance is None:
+        _deepseek_instance = DeepseekService()
+    return _deepseek_instance
+
 
 # ============================================================
 # 工具定义
@@ -60,40 +111,32 @@ TOOLS = [
                 "type": "array",
                 "description": "行业名称列表（可选）",
             },
+            "industry_level1": {
+                "type": "array",
+                "description": "行业名称(一级)列表（可选）",
+            },
+            "industry_level2": {
+                "type": "array",
+                "description": "行业名称(二级)列表（可选）",
+            },
+            "industry_level3": {
+                "type": "array",
+                "description": "行业名称(三级)列表（可选）",
+            },
             "categories": {
                 "type": "array",
-                "description": "投诉分类列表（可选）",
+                "description": "投诉问题分类列表（可选）",
+            },
+            "issue_level1": {
+                "type": "array",
+                "description": "涉及问题(一级)列表（可选）",
+            },
+            "issue_level2": {
+                "type": "array",
+                "description": "涉及问题(二级)列表（可选）",
             },
         },
         "action_type": "filter_data",
-    },
-    {
-        "name": "run_time_series_analysis",
-        "description": (
-            "执行时序分析，获取指定时间范围内的投诉量时间序列数据，"
-            "并在前端趋势图中展示。"
-            "适用场景：用户询问「投诉趋势」「某段时间内的变化」"
-            "「按月/周/天统计」「分析时间规律」等时序相关请求。"
-        ),
-        "parameters": {
-            "start_date": {
-                "type": "string",
-                "description": "开始日期，格式 YYYY-MM-DD（可选）",
-            },
-            "end_date": {
-                "type": "string",
-                "description": "结束日期，格式 YYYY-MM-DD（可选）",
-            },
-            "period": {
-                "type": "string",
-                "description": "时间粒度：day（按天）/ week（按周）/ month（按月），默认 day",
-            },
-            "companies": {
-                "type": "array",
-                "description": "限定企业范围（可选）",
-            },
-        },
-        "action_type": "update_trend",
     },
     {
         "name": "generate_report",
@@ -119,7 +162,7 @@ TOOLS = [
     {
         "name": "generate_reply_suggestion",
         "description": (
-            "调用 AI 模型，针对一条具体的市民投诉内容，生成专业的官方回复建议。"
+            "调用本地大模型，针对一条具体的市民投诉内容，生成专业的官方回复建议。"
             "适用场景：用户输入或粘贴了一段投诉文字，要求「帮我写回复」"
             "「生成回复建议」「怎么回复这条投诉」等辅助回复请求。"
         ),
@@ -147,24 +190,20 @@ class AgentService:
         初始化Agent服务
 
         Args:
-            model_path: 模型路径，默认使用现有 vLLM 配置
+            model_path: 模型路径，给本地 vLLM 使用（仅用于回复建议）
         """
         self.ai_service = None
         self.model_path = model_path
         self._last_context: Optional[Dict[str, Any]] = None
-        logger.info("AgentService 初始化完成")
+        logger.info("AgentService 初始化完成 (Deepseek 集成版)")
 
     # ----------------------------------------------------------
     # 内部辅助方法
     # ----------------------------------------------------------
 
-    def _get_ai_service(self):
-        """懒加载 AI 服务（单例）"""
-        if self.ai_service is None:
-            from src.ai_service_vllm import get_vllm_ai_service
-
-            self.ai_service = get_vllm_ai_service(model_path=self.model_path)
-        return self.ai_service
+    def _get_deepseek_service(self):
+        """获取 Deepseek API 服务实例"""
+        return get_deepseek_service()
 
     def _build_tools_prompt(self) -> str:
         """构建工具描述 prompt 段落"""
@@ -280,6 +319,7 @@ class AgentService:
     ) -> Dict[str, Any]:
         """
         处理用户消息：意图识别 → 工具调用 → 构建响应
+        使用 Deepseek API 进行意图识别。
 
         Args:
             user_message: 用户输入
@@ -306,7 +346,6 @@ class AgentService:
 ## 意图识别规则
 1. **明确执行步骤**：先分析用户完整意图，再列出需要依次执行的工具步骤。
 2. **工具调用顺序**：
-   - 若用户要求「筛选数据后再分析」，应先调用 `update_frontend_filter`，再调用 `run_time_series_analysis`。
    - 若用户要求「查看当前数据并生成报告」，应先调用 `read_frontend_display`，再调用 `generate_report`。
    - 单步任务（如仅筛选、仅查看、仅生成报告）只调用一个工具。
 3. **参数解析**：
@@ -316,7 +355,7 @@ class AgentService:
 4. **generate_reply_suggestion**：仅在用户明确提供投诉原文并要求起草回复时调用。
 5. **read_frontend_display**：仅在用户询问当前显示内容时调用，无需任何参数。
 
-## 响应格式（严格 JSON）
+## 响应格式（严格返回合法的 JSON 对象，不要包含多余的格式化符号或 markdown 代码块）
 {{
   "thought": "对用户意图的分析，说明选择该工具的原因",
   "steps": [
@@ -339,24 +378,15 @@ class AgentService:
 }}
 """
 
-            # ── 2. 调用 AI 模型识别意图 ────────────────────────
-            ai_service = self._get_ai_service()
-            response = ai_service.generate_response(
-                user_input=user_message,
-                system_prompt=system_prompt,
-                temperature=0.2,  # 低温度，提升结构化输出稳定性
-                max_tokens=1024,
-                stream=False,
-            )
+            # ── 2. 调用 Deepseek API 识别意图 ────────────────────────
+            deepseek = self._get_deepseek_service()
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
 
-            if isinstance(response, dict):
-                ai_reply = response.get("reply", "")
-                thinking = response.get("thinking")
-            else:
-                ai_reply = str(response)
-                thinking = None
-
-            logger.info(f"AI 原始响应: {ai_reply}")
+            ai_reply = deepseek.chat(messages, temperature=0.1, max_tokens=1024)
+            logger.info(f"Deepseek AI 原始响应: {ai_reply}")
 
             # ── 3. 解析 JSON ───────────────────────────────────
             intent = self._parse_intent_json(ai_reply)
@@ -365,7 +395,7 @@ class AgentService:
                     "success": True,
                     "message": ai_reply if ai_reply else "抱歉，我没有理解您的需求。",
                     "action": None,
-                    "thinking": thinking,
+                    "thinking": None,
                 }
 
             steps: List[dict] = intent.get("steps", [])
@@ -375,7 +405,7 @@ class AgentService:
                 return {
                     "success": True,
                     "message": intent.get(
-                        "message",
+                        "message", "抱歉，没有识别到具体的工具操作。"
                     ),
                     "action": None,
                     "thinking": intent.get("thought"),
@@ -434,7 +464,7 @@ class AgentService:
                 "message": intent.get("message", "已为您执行操作"),
                 "action": last_action,  # 前端主要使用最后一步的 action
                 "steps": results,  # 完整步骤结果（供前端按需使用）
-                "thinking": intent.get("thought") or thinking,
+                "thinking": intent.get("thought"),
                 "generated_at": datetime.now().isoformat(),
             }
 
@@ -452,7 +482,7 @@ class AgentService:
         # 去除可能的 markdown 代码块
         if json_str.startswith("```json"):
             json_str = json_str[7:]
-        if json_str.startswith("```"):
+        elif json_str.startswith("```"):
             json_str = json_str[3:]
         if json_str.endswith("```"):
             json_str = json_str[:-3]
@@ -469,25 +499,13 @@ class AgentService:
     # ----------------------------------------------------------
 
     def _call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        调用具体工具
-
-        Args:
-            tool_name: 工具名称
-            parameters: 工具参数
-
-        Returns:
-            dict: { success, data } 或 { success, error }
-        """
+        """调用具体工具"""
         try:
             if tool_name == "read_frontend_display":
                 return self._tool_read_frontend_display()
 
             elif tool_name == "update_frontend_filter":
                 return self._tool_update_frontend_filter(parameters)
-
-            elif tool_name == "run_time_series_analysis":
-                return self._tool_run_time_series_analysis(parameters)
 
             elif tool_name == "generate_report":
                 return self._tool_generate_report(parameters)
@@ -545,35 +563,10 @@ class AgentService:
         logger.info(f"update_frontend_filter: 新筛选条件 = {clean_params}")
         return {"success": True, "data": clean_params}
 
-    def _tool_run_time_series_analysis(
-        self, parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        工具3：执行时序分析，获取投诉趋势数据
-        """
-        from src.models import Model
-
-        model = Model()
-
-        data = model.get_trend_data(
-            start_date=parameters.get("start_date"),
-            end_date=parameters.get("end_date"),
-            period=parameters.get("period", "day"),
-            companies=parameters.get("companies"),
-            industries=parameters.get("industries"),
-        )
-        logger.info(
-            f"run_time_series_analysis: 获取趋势数据，period={parameters.get('period', 'day')}"
-        )
-        return {"success": True, "data": data}
-
     def _tool_generate_report(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
-        工具4：生成投诉分析报告
-        优先使用前端 context 中的统计数据（含图表摘要），避免重复调用 API
+        工具3：生成投诉分析报告 (现在调用 Deepseek API)
         """
-        from src.ai_service_vllm import get_vllm_ai_service
-
         stats = None
         use_context = False
         time_range_str = f"{parameters.get('start_date', '开始')} 至 {parameters.get('end_date', '结束')}"
@@ -700,8 +693,51 @@ class AgentService:
             "scatter_summary": scatter_summary,
         }
 
-        ai_service = get_vllm_ai_service()
-        report = ai_service.generate_report(report_data, stream=False)
+        # 调用 Deepseek API 生成报告
+        system_prompt = """你是一位专业的数据分析专家，擅长分析工商投诉数据并撰写详细的分析报告。
+请根据提供的数据，生成一份专业、清晰、有洞察力的投诉分析报告。
+报告应包含：数据概况、趋势分析、问题总结和监管建议。"""
+
+        user_input = f"""请根据以下投诉数据生成一份详细的分析报告：
+
+数据概况：
+- 分析时间范围：{report_data.get("time_range", "未指定")}
+- 总投诉量：{report_data.get("total_complaints", 0)}条
+- 涉及企业数：{report_data.get("total_companies", 0)}家
+- 涉及行业数：{report_data.get("total_industries", 0)}个
+- 重复投诉企业数：{report_data.get("repeat_companies", 0)}家
+
+投诉趋势：
+{report_data.get("trend_summary", "暂无趋势数据")}
+
+投诉分类分布（旭日图）：
+{report_data.get("category_summary", "暂无分类数据")}
+
+企业风险分布（散点图，投诉量前10名）：
+{report_data.get("scatter_summary", "暂无散点图数据")}
+
+投诉最多的企业排行（前10名）：
+{report_data.get("top_companies", "暂无企业数据")}
+
+请生成一份包含以下部分的专业报告（使用 Markdown 格式）：
+1. 摘要（简明扼要总结关键发现）
+2. 数据概况（详细说明数据范围和基本情况）
+3. 投诉趋势分析（分析投诉量的变化趋势和规律）
+4. 投诉分类分析（基于旭日图数据分析主要问题类型分布）
+5. 重点企业分析（结合散点图风险分布，分析投诉最多和高风险企业）
+6. 监管建议（提出针对性的监管措施和改进方向）
+
+要求：语言专业、数据准确、分析深入、建议可行。"""
+
+        deepseek = self._get_deepseek_service()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ]
+
+        logger.info("generate_report: 调用 Deepseek 生报告...")
+        report = deepseek.chat(messages, temperature=0.7, max_tokens=2048)
+        logger.info("generate_report: Deepseek 报告生成完成")
 
         return {
             "success": True,
@@ -716,7 +752,8 @@ class AgentService:
         self, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        工具5：生成投诉辅助回复
+        工具4：生成投诉辅助回复
+        （继续使用本地大模型 + LoRA 模块）
         """
         complaint_content = parameters.get("complaint_content", "").strip()
         if not complaint_content:
@@ -724,14 +761,30 @@ class AgentService:
 
         from src.ai_service_vllm import get_vllm_ai_service
 
-        ai_service = get_vllm_ai_service()
+        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        lora_dir = os.path.join(current_dir, "lora-dir")
+
+        logger.info(f"generate_reply_suggestion: 调用本地 vLLM 并使用 LoRA: {lora_dir}")
+        adapter_path = os.getenv("LORA_PATH", lora_dir)
+
+        ai_service = get_vllm_ai_service(
+            model_path=self.model_path, adapter_path=adapter_path
+        )
         reply = ai_service.generate_reply_suggestion(complaint_content, stream=False)
+
+        # vLLM generate_response返回的是一个 dict {"thinking": ..., "reply": ..., "full_response": ...}
+        # generate_reply_suggestion 在 ai_service_vllm 里面返回 dict or Generator
+        # 取 reply 字段返回给前端
+        if isinstance(reply, dict):
+            reply_text = reply.get("reply", str(reply))
+        else:
+            reply_text = str(reply)
 
         logger.info("generate_reply_suggestion: 生成投诉回复建议完成")
         return {
             "success": True,
             "data": {
-                "reply": reply,
+                "reply": reply_text,
                 "complaint_content": complaint_content,
             },
         }
@@ -744,15 +797,7 @@ _agent_service_instance: Optional[AgentService] = None
 
 
 def get_agent_service(model_path: str = None) -> AgentService:
-    """
-    获取 AgentService 单例
-
-    Args:
-        model_path: 模型路径（可选）
-
-    Returns:
-        AgentService 实例
-    """
+    """获取 AgentService 单例"""
     global _agent_service_instance
     if _agent_service_instance is None:
         _agent_service_instance = AgentService(model_path=model_path)

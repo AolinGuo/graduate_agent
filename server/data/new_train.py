@@ -5,6 +5,7 @@ import time
 from openai import OpenAI
 
 from dotenv import load_dotenv
+
 load_dotenv()  # 这会寻找并加载同目录下的 .env 文件
 # 导入你提供的本地 RAG 服务
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,9 +16,11 @@ from rag_service import LegalRAGService
 
 
 # ================= 配置区域 =================
-INPUT_FILE = "/mnt/disk2/aolin.guo/graduate_agent/server/data/qa_data.jsonl"         # 原始数据集路径
+INPUT_FILE = (
+    "/mnt/disk2/aolin.guo/graduate_agent/server/data/qa_data.jsonl"  # 原始数据集路径
+)
 OUTPUT_FILE = "/mnt/disk2/aolin.guo/graduate_agent/server/data/finetune_data.jsonl"  # 输出的微调数据集路径
-API_KEY = os.environ.get('DEEPSEEK_API_KEY')
+API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 BASE_URL = "https://api.deepseek.com"
 MODEL_NAME = "deepseek-chat"
 
@@ -33,6 +36,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 print("正在初始化 RAG 服务...")
 rag_service = LegalRAGService()
 
+
 def call_llm(messages, retries=3):
     """通用 LLM 调用函数，带重试机制"""
     for i in range(retries):
@@ -41,14 +45,15 @@ def call_llm(messages, retries=3):
                 model=MODEL_NAME,
                 messages=messages,
                 stream=False,
-                temperature=0.3, # 保持一定的确定性
-                response_format={"type": "json_object"} # 强制返回 JSON 格式方便解析
+                temperature=0.3,  # 保持一定的确定性
+                response_format={"type": "json_object"},  # 强制返回 JSON 格式方便解析
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"   API 调用失败 (尝试 {i+1}/{retries}): {e}")
+            print(f"   API 调用失败 (尝试 {i + 1}/{retries}): {e}")
             time.sleep(2)
     return None
+
 
 def step_1_clean_and_query(raw_q, raw_a):
     """
@@ -72,18 +77,19 @@ def step_1_clean_and_query(raw_q, raw_a):
         "search_query": "..."
     }}
     """
-    
+
     messages = [
         {"role": "system", "content": "你是一个辅助数据处理的JSON生成器。"},
-        {"role": "user", "content": prompt}
+        {"role": "user", "content": prompt},
     ]
-    
+
     result = call_llm(messages)
     try:
         return json.loads(result)
     except:
         print("   ❌ JSON 解析失败，跳过此条")
         return None
+
 
 def step_2_generate_final_response(cleaned_q, cleaned_a, rag_context_text):
     """
@@ -106,17 +112,18 @@ def step_2_generate_final_response(cleaned_q, cleaned_a, rag_context_text):
     
     请以 JSON 格式返回，Key 为 "final_reply"。
     """
-    
+
     messages = [
         {"role": "system", "content": "你是一个专业的政府热线回复专员。"},
-        {"role": "user", "content": prompt}
+        {"role": "user", "content": prompt},
     ]
-    
+
     result = call_llm(messages)
     try:
         return json.loads(result).get("final_reply", "")
     except:
         return None
+
 
 def process_dataset():
     if not os.path.exists(INPUT_FILE):
@@ -124,49 +131,53 @@ def process_dataset():
         return
 
     print(f"开始处理数据，结果将写入: {OUTPUT_FILE}")
-    
-    with open(INPUT_FILE, 'r', encoding='utf-8') as f_in, \
-         open(OUTPUT_FILE, 'w', encoding='utf-8') as f_out:
-        
+
+    with (
+        open(INPUT_FILE, "r", encoding="utf-8") as f_in,
+        open(OUTPUT_FILE, "w", encoding="utf-8") as f_out,
+    ):
         lines = f_in.readlines()
         total = len(lines)
-        
+
         for idx, line in enumerate(lines):
             line = line.strip()
-            if not line: continue
-            
-            print(f"[{idx+1}/{total}] 正在处理...", end="", flush=True)
-            
+            if not line:
+                continue
+
+            print(f"[{idx + 1}/{total}] 正在处理...", end="", flush=True)
+
             try:
                 data = json.loads(line)
                 raw_q = data.get("question", "")
                 raw_a = data.get("answer", "")
-                
+
                 # --- 阶段 1: 清洗与Query生成 (API) ---
                 cleaned_data = step_1_clean_and_query(raw_q, raw_a)
                 if not cleaned_data:
                     continue
-                
-                c_question = cleaned_data['cleaned_question']
-                c_answer = cleaned_data['cleaned_answer']
-                search_query = cleaned_data['search_query']
-                
+
+                c_question = cleaned_data["cleaned_question"]
+                c_answer = cleaned_data["cleaned_answer"]
+                search_query = cleaned_data["search_query"]
+
                 # --- 阶段 2: RAG 检索 (本地) ---
                 # 检索 Top 3 条法律
                 rag_results = rag_service.search(search_query, top_k=3)
-                
+
                 # 格式化检索到的法律条文，准备喂给 LLM 和放入 Input 字段
                 rag_texts = []
                 for res in rag_results:
                     # 组合来源和内容，例如：《消费者权益保护法》第二十四条...
                     text = f"《{res['source']}》: {res['content']}"
                     rag_texts.append(text)
-                
+
                 rag_context_str = "\n".join(rag_texts)
-                
+
                 # --- 阶段 3: 生成最终回复 (API) ---
-                final_reply = step_2_generate_final_response(c_question, c_answer, rag_context_str)
-                
+                final_reply = step_2_generate_final_response(
+                    c_question, c_answer, rag_context_str
+                )
+
                 if not final_reply:
                     print(" ❌ 生成回复失败")
                     continue
@@ -177,23 +188,23 @@ def process_dataset():
                 # input: RAG检索到的背景知识（法律条文）
                 # output: 最终生成的有理有据的回复
                 # system: 预设的系统提示词
-                
+
                 finetune_entry = {
-                    
                     "instruction": c_question,
                     "input": rag_context_str,
                     "output": final_reply,
-                    "system": SYSTEM_PROMPT
+                    "system": SYSTEM_PROMPT,
                 }
-                
+
                 # 写入文件
                 f_out.write(json.dumps(finetune_entry, ensure_ascii=False) + "\n")
                 print(" ✅ 完成")
-                
+
             except json.JSONDecodeError:
                 print(" ❌ 原始数据格式错误")
             except Exception as e:
                 print(f" ❌ 处理异常: {e}")
+
 
 if __name__ == "__main__":
     process_dataset()

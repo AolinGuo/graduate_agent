@@ -390,7 +390,9 @@ class Model:
             # 确保时间字段是datetime类型
             if not pd.api.types.is_datetime64_any_dtype(data[date_column]):
                 try:
-                    data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+                    data[date_column] = pd.to_datetime(
+                        data[date_column], errors="coerce"
+                    )
                     logger.info(f"转换时间字段 {date_column} 为datetime类型")
                 except Exception as e:
                     logger.error(f"转换时间字段 {date_column} 失败: {e}")
@@ -864,7 +866,10 @@ class Model:
                 date_column = None
 
                 for field in date_fields:
-                    if field in filtered_data.columns and not filtered_data[field].isna().all():
+                    if (
+                        field in filtered_data.columns
+                        and not filtered_data[field].isna().all()
+                    ):
                         date_column = field
                         break
 
@@ -873,12 +878,16 @@ class Model:
                         # 按企业和月份分组，统计每个企业每月的投诉次数
                         filtered_data_copy = filtered_data.copy()
                         # 确保日期字段是datetime类型
-                        if not pd.api.types.is_datetime64_any_dtype(filtered_data_copy[date_column]):
+                        if not pd.api.types.is_datetime64_any_dtype(
+                            filtered_data_copy[date_column]
+                        ):
                             filtered_data_copy[date_column] = pd.to_datetime(
                                 filtered_data_copy[date_column], errors="coerce"
                             )
 
-                        if pd.api.types.is_datetime64_any_dtype(filtered_data_copy[date_column]):
+                        if pd.api.types.is_datetime64_any_dtype(
+                            filtered_data_copy[date_column]
+                        ):
                             filtered_data_copy["年月"] = filtered_data_copy[
                                 date_column
                             ].dt.to_period("M")
@@ -893,7 +902,9 @@ class Model:
                             )
                             repeat_companies_count = len(repeat_companies)
                         else:
-                            logger.warning(f"时间字段 {date_column} 无法转换为datetime类型")
+                            logger.warning(
+                                f"时间字段 {date_column} 无法转换为datetime类型"
+                            )
                     except Exception as e:
                         logger.error(f"计算月内重复投诉企业数失败: {e}")
                         repeat_companies_count = 0
@@ -1393,9 +1404,10 @@ class Model:
                 )
 
             for _, row in filtered_data.iterrows():
+
                 def safe_str(value):
                     """安全地将值转换为字符串，过滤掉NaN和None"""
-                    if pd.isna(value) or str(value).lower() == 'nan':
+                    if pd.isna(value) or str(value).lower() == "nan":
                         return ""
                     return str(value).strip()
 
@@ -1405,10 +1417,18 @@ class Model:
                     "reply": safe_str(row.get(selected_fields.get("reply"), "无回复")),
                     "issue1": safe_str(row.get(selected_fields.get("issue1"), "")),
                     "issue2": safe_str(row.get(selected_fields.get("issue2"), "")),
-                    "industry1": safe_str(row.get(selected_fields.get("industry1"), "")),
-                    "industry2": safe_str(row.get(selected_fields.get("industry2"), "")),
-                    "industry3": safe_str(row.get(selected_fields.get("industry3"), "")),
-                    "design_issue1": safe_str(row.get(selected_fields.get("design_issue1"), "")),
+                    "industry1": safe_str(
+                        row.get(selected_fields.get("industry1"), "")
+                    ),
+                    "industry2": safe_str(
+                        row.get(selected_fields.get("industry2"), "")
+                    ),
+                    "industry3": safe_str(
+                        row.get(selected_fields.get("industry3"), "")
+                    ),
+                    "design_issue1": safe_str(
+                        row.get(selected_fields.get("design_issue1"), "")
+                    ),
                 }
                 result.append(item)
 

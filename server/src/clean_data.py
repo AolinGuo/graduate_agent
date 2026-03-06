@@ -15,7 +15,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = TARGET_GPU_IDS
 TENSOR_PARALLEL_SIZE = 4
 
 # 模型与数据路径配置
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # server/
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # server/
 MODEL_PATH = os.path.join(BASE_DIR, "model-dir")
 INPUT_FILE = os.path.join(BASE_DIR, "data", "qa_data.jsonl")
 OUTPUT_FILE = os.path.join(BASE_DIR, "data", "qa_data_cleaned.jsonl")
@@ -27,21 +27,28 @@ from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 
 # 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 class DataCleaningJob:
     def __init__(self, model_path: str):
         self.model_path = model_path
-        
+
         # 打印当前使用的设备配置
         logger.info("正在初始化多卡清洗任务...")
-        logger.info(f"使用显卡 (CUDA_VISIBLE_DEVICES): {os.environ.get('CUDA_VISIBLE_DEVICES')}")
+        logger.info(
+            f"使用显卡 (CUDA_VISIBLE_DEVICES): {os.environ.get('CUDA_VISIBLE_DEVICES')}"
+        )
         logger.info(f"并行度 (Tensor Parallel): {TENSOR_PARALLEL_SIZE}")
-        
+
         # 1. 初始化 Tokenizer
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_path, trust_remote_code=True
+            )
         except Exception as e:
             logger.error(f"Tokenizer加载失败: {e}")
             raise
@@ -57,7 +64,7 @@ class DataCleaningJob:
                 tensor_parallel_size=TENSOR_PARALLEL_SIZE,
                 dtype="bfloat16",
                 # 分布式推理依赖 Ray，vLLM 会自动处理，但建议显式指定
-                distributed_executor_backend="ray" 
+                distributed_executor_backend="ray",
             )
         except Exception as e:
             logger.error(f"vLLM引擎加载失败 (请检查显存是否足够): {e}")
@@ -81,13 +88,11 @@ class DataCleaningJob:
 
         messages = [
             {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content}
+            {"role": "user", "content": user_content},
         ]
 
         prompt = self.tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
-            add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True
         )
         return prompt
 
@@ -100,12 +105,13 @@ class DataCleaningJob:
         logger.info(f"正在读取数据: {input_path}")
         raw_data = []
         prompts = []
-        valid_indices = [] 
+        valid_indices = []
 
-        with open(input_path, 'r', encoding='utf-8') as f:
+        with open(input_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             for idx, line in enumerate(lines):
-                if not line.strip(): continue
+                if not line.strip():
+                    continue
                 try:
                     item = json.loads(line)
                     raw_data.append(item)
@@ -122,11 +128,7 @@ class DataCleaningJob:
         logger.info(f"准备处理 {len(prompts)} 条数据。")
 
         # 2. 设置采样参数 (低温度保证清洗准确性)
-        sampling_params = SamplingParams(
-            temperature=0.1, 
-            top_p=0.9, 
-            max_tokens=1024
-        )
+        sampling_params = SamplingParams(temperature=0.1, top_p=0.9, max_tokens=1024)
 
         # 3. vLLM 批量推理 (自动利用 4 张卡并行计算)
         logger.info(f"开始在 {TENSOR_PARALLEL_SIZE} 张 GPU 上进行批量推理...")
@@ -137,37 +139,46 @@ class DataCleaningJob:
         for i, output_obj in enumerate(outputs):
             original_idx = valid_indices[i]
             generated_text = output_obj.outputs[0].text.strip()
-            
+
             # 过滤可能的思维链标签
             if "<think>" in generated_text:
                 parts = generated_text.split("</think>")
                 if len(parts) > 1:
                     generated_text = parts[-1].strip()
-            
+
             raw_data[original_idx]["question"] = generated_text
 
         # 5. 保存
         logger.info(f"写入结果: {output_path}")
-        with open(output_path, 'w', encoding='utf-8') as f_out:
+        with open(output_path, "w", encoding="utf-8") as f_out:
             for item in raw_data:
                 f_out.write(json.dumps(item, ensure_ascii=False) + "\n")
-        
+
         logger.info("任务完成。")
+
 
 if __name__ == "__main__":
     # 简单的环境检查
     import torch
+
     if torch.cuda.device_count() < TENSOR_PARALLEL_SIZE:
-        logger.warning(f"警告：检测到的 GPU 数量 ({torch.cuda.device_count()}) 少于配置的并行度 ({TENSOR_PARALLEL_SIZE})，程序可能会报错。")
+        logger.warning(
+            f"警告：检测到的 GPU 数量 ({torch.cuda.device_count()}) 少于配置的并行度 ({TENSOR_PARALLEL_SIZE})，程序可能会报错。"
+        )
 
     # 确保目录存在
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    
+
     # 模拟数据生成 (如果文件不存在)
     if not os.path.exists(INPUT_FILE):
         logger.info("生成测试数据...")
-        test_data = [{"question": "测试数据：我在丰台区使用了200元购买商品，订单号123456", "answer": "已处理"}] * 10
-        with open(INPUT_FILE, 'w', encoding='utf-8') as f:
+        test_data = [
+            {
+                "question": "测试数据：我在丰台区使用了200元购买商品，订单号123456",
+                "answer": "已处理",
+            }
+        ] * 10
+        with open(INPUT_FILE, "w", encoding="utf-8") as f:
             for item in test_data:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
 

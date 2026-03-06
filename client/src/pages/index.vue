@@ -25,7 +25,7 @@
               
               <!-- 企业筛选 -->
               <el-form-item class="mb-3">
-                <el-select v-model="filters.selectedCompanies" multiple collapse-tags collapse-tags-tooltip placeholder="企业" style="width: 100%" size="small">
+                <el-select v-model="filters.selectedCompanies" multiple collapse-tags collapse-tags-tooltip filterable placeholder="企业" style="width: 100%" size="small">
                   <el-option v-for="c in filterOptions.companies" :key="c" :label="c" :value="c" />
                 </el-select>
               </el-form-item>
@@ -33,13 +33,13 @@
               <!-- 行业筛选（两列布局） -->
               <div style="display: flex; gap: 8px;" class="mb-3">
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIndustries" multiple collapse-tags collapse-tags-tooltip placeholder="行业分类" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIndustries" multiple collapse-tags collapse-tags-tooltip filterable placeholder="行业分类" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.industry_classification" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
                 
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIndustryLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(1)" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIndustryLevel1" multiple collapse-tags collapse-tags-tooltip filterable placeholder="行业名称(1)" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.industry_level1" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
@@ -47,13 +47,13 @@
               
               <div style="display: flex; gap: 8px;" class="mb-3">
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIndustryLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(2)" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIndustryLevel2" multiple collapse-tags collapse-tags-tooltip filterable placeholder="行业名称(2)" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.industry_level2" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
                 
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIndustryLevel3" multiple collapse-tags collapse-tags-tooltip placeholder="行业名称(3)" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIndustryLevel3" multiple collapse-tags collapse-tags-tooltip filterable placeholder="行业名称(3)" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.industry_level3" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
@@ -62,7 +62,7 @@
               
               <!-- 问题筛选 -->
               <el-form-item class="mb-3">
-                <el-select v-model="filters.selectedCategories" multiple collapse-tags collapse-tags-tooltip placeholder="问题分类" style="width: 100%" size="small">
+                <el-select v-model="filters.selectedCategories" multiple collapse-tags collapse-tags-tooltip filterable placeholder="问题分类" style="width: 100%" size="small">
                   <el-option v-for="c in filterOptions.categories" :key="c" :label="c" :value="c" />
                 </el-select>
               </el-form-item>
@@ -71,13 +71,13 @@
               <!-- 涉及问题筛选（两列布局） -->
               <div style="display: flex; gap: 8px;" class="mb-3">
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIssueLevel1" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(1)" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIssueLevel1" multiple collapse-tags collapse-tags-tooltip filterable placeholder="涉及问题(1)" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.issue_level1" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
                 
                 <el-form-item style="flex: 1; margin-bottom: 0;">
-                  <el-select v-model="filters.selectedIssueLevel2" multiple collapse-tags collapse-tags-tooltip placeholder="涉及问题(2)" style="width: 100%" size="small">
+                  <el-select v-model="filters.selectedIssueLevel2" multiple collapse-tags collapse-tags-tooltip filterable placeholder="涉及问题(2)" style="width: 100%" size="small">
                     <el-option v-for="c in filterOptions.issue_level2" :key="c" :label="c" :value="c" />
                   </el-select>
                 </el-form-item>
