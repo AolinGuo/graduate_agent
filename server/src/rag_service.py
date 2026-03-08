@@ -15,13 +15,11 @@ class LegalRAGService:
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         self.model_path = os.getenv(
-            "EMBEDDING_MODEL_PATH",
-            os.path.join(BASE_DIR, "embedding_model")
+            "EMBEDDING_MODEL_PATH", os.path.join(BASE_DIR, "embedding_model")
         )
 
         self.vector_db_path = os.getenv(
-            "RAG_VECTOR_PATH",
-            os.path.join(BASE_DIR, "rag_vector")
+            "RAG_VECTOR_PATH", os.path.join(BASE_DIR, "rag_vector")
         )
         self.vector_db = None
 
@@ -52,7 +50,7 @@ class LegalRAGService:
                 model_kwargs={
                     "device": device,
                     "trust_remote_code": True,
-                },  
+                },
                 encode_kwargs={"normalize_embeddings": True},
             )
 

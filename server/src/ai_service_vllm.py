@@ -31,6 +31,8 @@ VLLM_CONFIG = {
         "max_model_len": int(os.getenv("MAX_MODEL_LEN", "9192")),
         "gpu_memory_utilization": float(os.getenv("GPU_MEM_UTIL", "0.9")),
         "trust_remote_code": True,
+        # vLLM 加载 LoRA 时通常需要指定最大 rank，可根据你的实际 LoRA 修改 (如 8, 16, 32, 64)
+        "max_lora_rank": 32,
     },
     "sampling": {
         "temperature": 0.7,
@@ -56,12 +58,15 @@ class VLLMAIService:
         初始化vLLM AI服务
 
         Args:
-            model_path: 基础模型路径，优先级：参数 > 环境变量 MODEL_PATH > server/model-dir
-            adapter_path: LoRA 权重路径（vLLM 原生支持），优先级：参数 > 环境变量 LORA_PATH
+            model_path: 基础模型路径
+            adapter_path: LoRA 权重路径
         """
         self.llm = None
         self.tokenizer = None
         self.model_loaded = False
+
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        DEFAULT_LORA_PATH = os.path.join(BASE_DIR, "lora-dir")
 
         # 设置基础模型路径：参数 > 环境变量 > 默认相对路径
         if model_path is None:
@@ -76,9 +81,9 @@ class VLLMAIService:
 
         self.model_path = model_path
 
-        # 设置 LoRA 路径：参数 > 环境变量 > None
+        # 设置 LoRA 路径：参数 > 环境变量 > 直接写死的 DEFAULT_LORA_PATH
         if adapter_path is None:
-            adapter_path = os.getenv("LORA_PATH") or None
+            adapter_path = os.getenv("LORA_PATH") or DEFAULT_LORA_PATH
         self.adapter_path = adapter_path
 
         # 记录当前 GPU 配置
@@ -96,7 +101,7 @@ class VLLMAIService:
         try:
             logger.info(f"正在使用vLLM加载模型: {self.model_path}")
             if self.adapter_path:
-                logger.info(f"同时加载 LoRA 权重: {self.adapter_path}")
+                logger.info(f"同时启用 LoRA 支持，准备加载: {self.adapter_path}")
 
             from vllm import LLM
             from transformers import AutoTokenizer
@@ -114,9 +119,10 @@ class VLLMAIService:
                 trust_remote_code=model_config["trust_remote_code"],
             )
 
-            # 如果指定了 LoRA 权重，通过 enable_lora 启用
+            # 🔴 如果指定了 LoRA 权重，启用 lora 并设置 rank
             if self.adapter_path:
                 llm_kwargs["enable_lora"] = True
+                llm_kwargs["max_lora_rank"] = model_config.get("max_lora_rank", 32)
 
             # 初始化vLLM引擎
             self.llm = LLM(**llm_kwargs)
@@ -146,25 +152,11 @@ class VLLMAIService:
         system_prompt: str = "You are a helpful assistant.",
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        max_new_tokens: int = None,  # 兼容 ai_service.py 的调用参数名
+        max_new_tokens: int = None,
         top_p: float = 0.9,
         stream: bool = False,
     ):
-        """
-        生成AI回复
-
-        Args:
-            user_input: 用户输入内容
-            system_prompt: 系统提示词
-            temperature: 采样温度
-            max_tokens: 最大生成token数（vLLM原生参数名）
-            max_new_tokens: 兼容 transformers 风格的参数名，与 max_tokens 二选一
-            top_p: nucleus采样参数
-            stream: 是否启用流式输出
-
-        Returns:
-            str or Generator: AI生成的回复（非流式）或生成器（流式）
-        """
+        """生成AI回复"""
         if not self.model_loaded:
             self.load_model()
 
@@ -193,14 +185,26 @@ class VLLMAIService:
                 max_tokens=max_tokens,
             )
 
-            logger.info(f"正在生成AI回复... (stream={stream})")
+            # 🔴 构建 LoRA 请求
+            lora_request = None
+            if self.adapter_path:
+                from vllm.lora.request import LoRARequest
+
+                # name: 可任意起名; lora_int_id: 必须是大于0的整数; lora_path: 本地权重路径
+                lora_request = LoRARequest("my_local_lora", 1, self.adapter_path)
+
+            logger.info(
+                f"正在生成AI回复... (stream={stream}, lora_enabled={bool(lora_request)})"
+            )
 
             if stream:
                 # 流式输出 - 返回生成器
-                return self._generate_stream(prompt, sampling_params)
+                return self._generate_stream(prompt, sampling_params, lora_request)
             else:
-                # 非流式输出 - 直接返回完整结果
-                outputs = self.llm.generate([prompt], sampling_params)
+                # 非流式输出 - 直接返回完整结果，附带 lora_request
+                outputs = self.llm.generate(
+                    [prompt], sampling_params, lora_request=lora_request
+                )
                 response = outputs[0].outputs[0].text
                 logger.info("AI回复生成完成")
 
@@ -212,24 +216,16 @@ class VLLMAIService:
             raise
 
     def _generate_stream(
-        self, prompt: str, sampling_params
+        self, prompt: str, sampling_params, lora_request=None
     ) -> Generator[Dict[str, Any], None, None]:
-        """
-        流式生成回复
-
-        Args:
-            prompt: 输入提示词
-            sampling_params: 采样参数
-
-        Yields:
-            dict: 包含生成的文本片段
-        """
-        # vLLM的流式生成使用异步方式
-        # 这里我们使用批处理模拟流式输出
+        """流式生成回复"""
         full_text = ""
 
         try:
-            outputs = self.llm.generate([prompt], sampling_params)
+            # 🔴 传入 lora_request
+            outputs = self.llm.generate(
+                [prompt], sampling_params, lora_request=lora_request
+            )
             response = outputs[0].outputs[0].text
 
             # 解析完整响应
@@ -273,22 +269,12 @@ class VLLMAIService:
             }
 
     def generate_report(self, report_data: Dict[str, Any], stream: bool = False):
-        """
-        生成投诉分析报告
-
-        Args:
-            report_data: 包含统计数据的字典
-            stream: 是否启用流式输出
-
-        Returns:
-            dict or Generator: 生成的报告内容
-        """
-        # 构建报告生成的提示词
+        """生成投诉分析报告"""
+        # ...（保持原有逻辑不变，直接调用 self.generate_response 即可）
         system_prompt = """你是一位专业的数据分析专家，擅长分析工商投诉数据并撰写详细的分析报告。
 请根据提供的数据，生成一份专业、清晰、有洞察力的投诉分析报告。
 报告应包含：数据概况、趋势分析、问题总结和监管建议。"""
 
-        # 构建数据摘要
         user_input = f"""请根据以下投诉数据生成一份详细的分析报告：
 
 数据概况：
@@ -320,7 +306,6 @@ class VLLMAIService:
 
 要求：语言专业、数据准确、分析深入、建议可行。"""
 
-        # 使用配置的参数
         sampling_config = VLLM_CONFIG["sampling"]
         return self.generate_response(
             user_input=user_input,
@@ -331,20 +316,8 @@ class VLLMAIService:
         )
 
     def generate_reply_suggestion(self, complaint_content: str, stream: bool = False):
-        """
-        生成投诉回复建议
-
-        在生成回复之前，先通过 RAG 服务检索与投诉内容最相关的法律条文，
-        并将其作为参考资料注入到系统提示词中，使模型能够引用具体法律依据。
-
-        Args:
-            complaint_content: 市民投诉内容
-            stream: 是否启用流式输出
-
-        Returns:
-            dict or Generator: AI生成的回复建议
-        """
-        # ── 1. RAG 检索相关法律条文 ──────────────────────────────────────
+        """生成投诉回复建议"""
+        # ...（保持原有逻辑不变，直接调用 self.generate_response 即可）
         legal_context = ""
         try:
             rag = _get_rag_service()
@@ -367,7 +340,6 @@ class VLLMAIService:
         except Exception as e:
             logger.warning(f"RAG 检索出错，将跳过法律召回: {e}")
 
-        # ── 2. 构建系统提示词（含法律参考）──────────────────────────────
         base_prompt = """
 你是一个专业的法律投诉处理助手。请根据用户的投诉内容和提供的法律条文，以第一人称（我/我们）的口吻，生成回复。回复需涵盖事件处理结果，并有理有据地引用法律条文解释原因，态度礼貌且专业。仅使用纯文本格式，所有内容以自然段落呈现，无需任何格式标记"
 """
@@ -381,14 +353,12 @@ class VLLMAIService:
         else:
             system_prompt = base_prompt
 
-        # ── 3. 构建用户输入 ───────────────────────────────────────────────
         user_input = f"""市民投诉内容如下：
 
 {complaint_content}
 
 请生成一份专业的官方回复建议。"""
 
-        # ── 4. 调用模型生成回复 ───────────────────────────────────────────
         sampling_config = VLLM_CONFIG["sampling"]
         return self.generate_response(
             user_input=user_input,
@@ -399,24 +369,14 @@ class VLLMAIService:
         )
 
     def _parse_response(self, response: str) -> dict:
-        """
-        解析AI响应，提取<think>标签中的思考过程
-
-        Args:
-            response: AI生成的原始响应
-
-        Returns:
-            dict: 包含thinking和reply的字典
-        """
+        """解析AI响应，提取<think>标签中的思考过程"""
         import re
 
-        # 查找<think>标签内容
         think_pattern = r"<think>(.*?)</think>"
         think_match = re.search(think_pattern, response, re.DOTALL)
 
         if think_match:
             thinking = think_match.group(1).strip()
-            # 移除<think>标签后的内容作为回复
             reply = re.sub(think_pattern, "", response, flags=re.DOTALL).strip()
         else:
             thinking = None
@@ -443,16 +403,7 @@ _vllm_ai_service_instance: Optional[VLLMAIService] = None
 def get_vllm_ai_service(
     model_path: str = None, adapter_path: str = None
 ) -> VLLMAIService:
-    """
-    获取vLLM AI服务实例（单例模式）
-
-    Args:
-        model_path: 模型路径，为 None 时从环境变量 MODEL_PATH 读取
-        adapter_path: LoRA 权重路径，为 None 时从环境变量 LORA_PATH 读取
-
-    Returns:
-        VLLMAIService: vLLM AI服务实例
-    """
+    """获取vLLM AI服务实例（单例模式）"""
     global _vllm_ai_service_instance
 
     if _vllm_ai_service_instance is None:

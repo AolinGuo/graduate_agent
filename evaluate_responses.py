@@ -324,12 +324,14 @@ class ResponseEvaluator:
         best_version = max(
             evaluations.items(),
             key=lambda x: (
-                x[1]["rouge_1"]
-                + x[1]["rouge_2"]
-                + x[1]["rouge_l"]
-                + x[1]["embedding_similarity"]
-            )
-            / 4,
+                (
+                    x[1]["rouge_1"]
+                    + x[1]["rouge_2"]
+                    + x[1]["rouge_l"]
+                    + x[1]["embedding_similarity"]
+                )
+                / 4
+            ),
         )
 
         logger.info(f"\n🏆 综合表现最佳版本: {best_version[0]}")

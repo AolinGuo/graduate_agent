@@ -516,7 +516,7 @@ class AgentService:
             }
 
         # 3. 构建深度 Prompt
-        system_prompt = f"""你是一位专业的政务数据分析专家。根据提供的详细统计数据编写分析报告。
+        system_prompt = """你是一位专业的政务数据分析专家。根据提供的详细统计数据编写分析报告。
 仅使用纯文本格式，所有内容以自然段落呈现，无需任何格式标记
 报告必须包含：数据基本面分析、投诉趋势研判、重点企业/行业风险评估、以及基于数据的监管对策建议。"""
 
@@ -536,8 +536,9 @@ class AgentService:
             temperature=0.7,
             max_tokens=4096,
         )
-
-        return {"success": True, "data": {"report": report}}
+        # 提取 content 文本字符串
+        report_content = report.content if hasattr(report, "content") else str(report)
+        return {"success": True, "data": {"report": report_content}}
 
     def _tool_generate_reply_suggestion(
         self, parameters: Dict[str, Any]

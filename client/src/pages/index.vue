@@ -1207,6 +1207,8 @@ watch(
   color: #1f2937;
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 /* Transition */

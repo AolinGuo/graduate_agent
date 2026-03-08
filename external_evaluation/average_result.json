@@ -1,0 +1,26 @@
+{
+    "base_output": {
+        "accuracy": 1.83,
+        "legal_Compliance": 1.03,
+        "completeness": 2.9,
+        "professionalism": 5.62
+    },
+    "lora_output": {
+        "accuracy": 2.98,
+        "legal_Compliance": 1.91,
+        "completeness": 2.84,
+        "professionalism": 6.63
+    },
+    "rag_output": {
+        "accuracy": 3.08,
+        "legal_Compliance": 4.97,
+        "completeness": 5.35,
+        "professionalism": 7.05
+    },
+    "lora_rag_output": {
+        "accuracy": 7.8,
+        "legal_Compliance": 8.46,
+        "completeness": 7.36,
+        "professionalism": 8.64
+    }
+}
