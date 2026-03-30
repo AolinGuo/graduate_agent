@@ -11,7 +11,7 @@ from pathlib import Path
 
 # ---------- 1. 统一管理 GPU 分配与环境设置 ----------
 # 设置使用的 GPU 编号
-gpu_id = "6"
+gpu_id = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
 
 # 自动计算显卡数量，供 ai_service_vllm.py 的 VLLM_CONFIG 使用
