@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from vllm import LLM, SamplingParams
 from vllm.lora.request import LoRARequest
+from tqdm import tqdm
 
 # 配置日志
 logging.basicConfig(
@@ -47,20 +48,27 @@ class VLLMResponseGenerator:
         return True
 
     def init_engine(self):
-        """初始化 vLLM 引擎 (只初始化一次，后续切换 LoRA)"""
+        """显式指定非 V1 引擎初始化"""
         if self.llm is not None:
             return True
 
         try:
-            logger.info(f"正在初始化 vLLM 引擎，模型路径: {MODEL_DIR}")
+            logger.info(f"正在以兼容模式初始化 vLLM 引擎...")
+            
+            # 显式导入 V0 的引擎类，绕过 V1 的自动检测
+            from vllm.engine.llm_engine import LLMEngine
+            from vllm.entrypoints.llm import LLM
+            
             self.llm = LLM(
                 model=str(MODEL_DIR),
-                tensor_parallel_size=1,  # 如果你有多个 GPU，可以增加此数值
+                tensor_parallel_size=1,
                 dtype="bfloat16",
-                gpu_memory_utilization=0.85,  # 留出一点显存给 LoRA 或其他操作
+                gpu_memory_utilization=0.85,
                 trust_remote_code=True,
-                enable_lora=True,  # 必须开启才能支持 LoRA
+                enable_lora=True,
                 max_model_len=4096,
+                # 关键：在异构环境/新驱动下建议开启 eager 模式，稳定性最高
+                enforce_eager=True, 
             )
             return True
         except Exception as e:
@@ -102,16 +110,64 @@ class VLLMResponseGenerator:
         # 2. 批量构造 Prompt
         for item in self.test_data:
             instruction = item.get("instruction", "")
-            system_prompt = item.get("system", "你是一个专业的法律投诉处理助手。")
+            system_prompt = (
+        "你是一名经验丰富的市场监督管理局公关专员，擅长撰写得体、专业、有温度的官方回复。\n"
+        "你的回复需要兼顾法律的严肃性和服务的亲和力。\n"
+        "核心原则：\n"
+        "1. 严格根据实际处理情况来回复，如果没有请自行根据法律生成回复。\n"
+        "2. 引用符合该案例的法律条文。\n"
+        "3. 禁止使用Markdown格式，生成完整的一段话。"
+            )
             input_text = item.get("input", "") if use_rag else ""
 
             # 构造格式化的对话内容
             if input_text:
-                user_content = (
-                    f"【投诉内容】：\n{instruction}\n\n【参考法律条文】：\n{input_text}"
-                )
+                user_content = f"""请为以下市民诉求撰写一份正式答复。
+
+        【市民诉求摘要】
+        {instruction}
+
+        【参考法律依据（RAG检索）】
+        {input_text}
+
+
+        【写作指令 - 请严格执行】
+        请输出一段纯文本回复，包含以下逻辑结构：
+
+        1. 首部（共情与确认）：
+        - 使用尊称“尊敬的市民您好”。
+        - 确认收到投诉，并使用“我局高度重视”、“已立即开展核查”等得体话术。
+
+        2. 正文（事实与法律）：
+        依据办理进度，简述调查经过和最终结果，结合参考法律依据说明处理合理性。
+
+        3. 尾部（服务承诺）：
+        - 感谢市民的监督与信任。
+
+        请直接生成回复内容，字数控制在250字左右："""
             else:
-                user_content = f"【投诉内容】：\n{instruction}"
+                user_content = f"""请为以下市民诉求撰写一份正式答复。
+
+        【市民诉求摘要】
+        {instruction}
+
+        【参考法律依据（RAG检索）】
+        无
+
+        【写作指令 - 请严格执行】
+        请输出一段纯文本回复，包含以下逻辑结构：
+
+        1. 首部（共情与确认）：
+        - 使用尊称“尊敬的市民您好”。
+        - 确认收到投诉，并使用“我局高度重视”、“已立即开展核查”等得体话术。
+
+        2. 正文（事实与法律）：
+        依据办理进度，简述调查经过和最终结果，结合参考法律依据说明处理合理性。
+
+        3. 尾部（服务承诺）：
+        - 感谢市民的监督与信任。
+
+        请直接生成回复内容，字数控制在250字左右："""
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -125,29 +181,32 @@ class VLLMResponseGenerator:
             prompts.append(prompt)
 
         # 3. 调用 vLLM 批量生成
-        logger.info(f"正在批量生成 {len(prompts)} 条回复...")
-        outputs = self.llm.generate(
-            prompts, sampling_params=self.sampling_params, lora_request=lora_request
-        )
-
-        # 4. 整理结果并保存
+        total = len(prompts)
+        logger.info(f"正在批量生成 {total} 条回复...")
+        
+        # 核心修改：带进度条的生成方式
         results = []
-        for i, output in enumerate(outputs):
-            generated_text = output.outputs[0].text.strip()
-
-            # 如果模型输出了 <think> 标签且你不需要它，可以在这里清洗
-            # clean_text = self._strip_thinking(generated_text)
-
-            results.append(
-                {
-                    "index": i,
-                    "instruction": self.test_data[i].get("instruction"),
-                    "reference_output": self.test_data[i].get("output"),
-                    "generated_output": generated_text,
-                    "use_rag": use_rag,
-                    "use_lora": use_lora,
-                }
+        # 初始化进度条
+        pbar = tqdm(total=total, desc=f"生成 {version_name}", unit="条")
+        
+        # 逐一生成（带进度）
+        for prompt in prompts:
+            output = self.llm.generate(
+                prompt, sampling_params=self.sampling_params, lora_request=lora_request
             )
+            generated_text = output[0].outputs[0].text.strip()
+            results.append({
+                "index": len(results),
+                "instruction": self.test_data[len(results)].get("instruction"),
+                "reference_output": self.test_data[len(results)].get("output"),
+                "generated_output": generated_text,
+                "use_rag": use_rag,
+                "use_lora": use_lora,
+            })
+            pbar.update(1)  # 进度条+1
+        
+        pbar.close()
+
 
         output_path = GENERATED_DIR / f"{version_name}_generated.json"
         with open(output_path, "w", encoding="utf-8") as f:
