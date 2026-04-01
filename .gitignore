@@ -9,12 +9,10 @@ node_modules
 *.log
 .venv/
 server/model-dir/
-server/output
-server/checkpoint-375/
-server/output/
 LlamaFactory/
 server/embedding_model/__pycache__/
 *.pyc
 server/embedding_model/
 server/lora-dir/
 testenv/
+.env

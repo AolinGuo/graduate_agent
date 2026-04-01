@@ -185,26 +185,39 @@ class VLLMResponseGenerator:
         logger.info(f"正在批量生成 {total} 条回复...")
         
         # 核心修改：带进度条的生成方式
+        chunk_size = 100 
         results = []
-        # 初始化进度条
-        pbar = tqdm(total=total, desc=f"生成 {version_name}", unit="条")
         
-        # 逐一生成（带进度）
-        for prompt in prompts:
-            output = self.llm.generate(
-                prompt, sampling_params=self.sampling_params, lora_request=lora_request
+        pbar = tqdm(total=len(prompts), desc=f"正在生成 {version_name}")
+        
+        for i in range(0, len(prompts), chunk_size):
+            chunk = prompts[i : i + chunk_size]
+            
+            # 核心：依然调用批量 generate，而不是循环单条 generate
+            outputs = self.llm.generate(
+                chunk, 
+                sampling_params=self.sampling_params, 
+                lora_request=lora_request
             )
-            generated_text = output[0].outputs[0].text.strip()
-            results.append({
-                "index": len(results),
-                "instruction": self.test_data[len(results)].get("instruction"),
-                "reference_output": self.test_data[len(results)].get("output"),
-                "generated_output": generated_text,
-                "use_rag": use_rag,
-                "use_lora": use_lora,
-            })
-            pbar.update(1)  # 进度条+1
-        
+            
+            # 整理当前块的结果
+            for j, output in enumerate(outputs):
+                actual_idx = i + j
+                generated_text = output.outputs[0].text.strip()
+                # 如果是 DeepSeek-R1，记得清洗思考过程
+                generated_text = self._strip_thinking(generated_text)
+                
+                results.append({
+                    "index": actual_idx,
+                    "instruction": self.test_data[actual_idx].get("instruction"),
+                    "reference_output": self.test_data[actual_idx].get("output"),
+                    "generated_output": generated_text,
+                    "use_rag": use_rag,
+                    "use_lora": use_lora,
+                })
+            
+            pbar.update(len(chunk))
+            
         pbar.close()
 
 
