@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ### 步骤2：下载向量模型（推荐使用本地模型）
 
 ```bash
-# 创建模型目录并下载 Youtu-Embedding 模型
+# 创建模型目录并下载 Embedding 模型
 cd server
 hf download Qwen/Qwen3-Embedding-0.6B   --local-dir embedding_model
 
